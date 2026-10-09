@@ -5,7 +5,7 @@
 #   - 後衛のセッター:前衛の対応する選手のすぐ後ろに隠れ、すぐ前に出られる位置
 #   - 前衛のセッター・レセプションに入らない前衛:ネット際
 #   - レセプションに入らない後衛:エンドライン寄りに隠れる
-# 最後にポジショナルフォルトにならないよう位置を補正するので、どんな並びでも反則にならない。
+# 最後にローテーション順(前後・左右の関係)を保つよう位置を補正する。
 #
 # サーブ時は基本ポジションで、サーバー(P1)はエンドラインの外に立つ。
 
@@ -90,7 +90,7 @@ default_reception <- function(team, k) {
   legalize_placement(pl)
 }
 
-#' ポジショナルフォルトにならないよう、必要最小限だけ位置をずらす
+#' ローテーション順(前後・左右の関係)を保つよう、必要最小限だけ位置をずらす
 legalize_placement <- function(pl, gap = FORMATION_GAP) {
   pl <- pl[order(pl$pos), ]
   # 左右:前衛 P4 < P3 < P2、後衛 P5 < P6 < P1
@@ -121,4 +121,46 @@ placement_key <- function(team, k, serving) {
 #' 保存した立ち位置があればそれを、なければ既定のフォーメーションを返す
 placement_for <- function(team, k, serving, placements = list()) {
   placements[[placement_key(team, k, serving)]] %||% default_formation(team, k, serving)
+}
+
+# レシーブ後の攻撃位置 --------------------------------------------------------------
+#
+# サイドアウト側(レシーブ側)の選手が、レセプションの位置から向かう位置。
+#   セッター        :セットアップ位置(ネット際のライト寄り)
+#   前衛 OH         :レフトの助走開始位置
+#   前衛 MB         :センターのクイックの助走位置
+#   前衛 OP         :ライトの助走開始位置
+#   後衛 OH         :バックアタック(パイプ)の助走位置
+#   後衛 OP         :バックライト(D)の助走位置
+#   リベロ・後衛 MB :動かない(矢印なし)
+ATTACK_SPOTS <- list(
+  setter = c(6.0, 0.6),
+  front_OH = c(0.6, 3.6),
+  front_MB = c(4.2, 2.6),
+  front_OP = c(8.4, 3.6),
+  back_OH = c(4.5, 7.0),
+  back_OP = c(7.8, 7.0)
+)
+
+#' レシーブ後の攻撃位置。data.frame(pos, role, x, y)(動かない選手は含まない)
+attack_positions <- function(team, k) {
+  cp <- court_players(team, k, serving = FALSE)
+  rows <- lapply(seq_len(nrow(cp)), function(i) {
+    role <- cp$role[i]
+    if (is.na(role)) return(NULL)
+    key <- if (role == "S") "setter" else paste0(if (is_front_row(cp$pos[i])) "front_" else "back_", role)
+    spot <- ATTACK_SPOTS[[key]]
+    if (is.null(spot)) return(NULL)
+    data.frame(pos = cp$pos[i], role = role, x = spot[1], y = spot[2])
+  })
+  out <- do.call(rbind, rows)
+  if (is.null(out)) data.frame(pos = integer(), role = character(), x = numeric(), y = numeric()) else out
+}
+
+#' レセプション位置 → 攻撃位置 の矢印。data.frame(role, x1, y1, x2, y2)(短すぎるものは省く)
+transition_arrows <- function(team, k, placement, min_length = 0.8) {
+  ap <- attack_positions(team, k)
+  from <- placement[match(ap$pos, placement$pos), ]
+  arrows <- data.frame(role = ap$role, x1 = from$x, y1 = from$y, x2 = ap$x, y2 = ap$y)
+  arrows[sqrt((arrows$x2 - arrows$x1)^2 + (arrows$y2 - arrows$y1)^2) >= min_length, , drop = FALSE]
 }

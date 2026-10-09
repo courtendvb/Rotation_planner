@@ -2,7 +2,7 @@
   --rp-floor: #f3d9b1;
   --rp-line: #ffffff;
   --rp-net: #333333;
-  --rp-S: #e0b000;
+  --rp-S: #1a1a1a;
   --rp-OH: #2f6fd6;
   --rp-MB: #2a9d5c;
   --rp-OP: #d2453b;
@@ -29,7 +29,6 @@ body { font-size: 15px; }
 .rp-court .marker-sub { fill: #333; font-size: 0.36px; }
 .rp-court .marker.draggable { cursor: grab; }
 .rp-court .marker.dragging { cursor: grabbing; opacity: 0.8; }
-.rp-court .marker.warn circle { stroke: var(--rp-bad); stroke-width: 0.16; }
 .rp-court .role-S circle { fill: var(--rp-S); }
 .rp-court .role-OH circle { fill: var(--rp-OH); }
 .rp-court .role-MB circle { fill: var(--rp-MB); }
@@ -45,7 +44,7 @@ body { font-size: 15px; }
 /* 試合中モード */
 .rp-score { display: flex; gap: 24px; align-items: center; justify-content: center; font-size: 56px; font-weight: bold; }
 .rp-score .team { font-size: 16px; font-weight: normal; color: #555; text-align: center; }
-.rp-score .serving::after { content: " ●"; color: var(--rp-S); }
+.rp-score .serving::after { content: " ●"; color: #e0a000; }
 .rp-live-buttons { display: flex; gap: 12px; margin: 12px 0; }
 .rp-live-buttons .btn { flex: 1; font-size: 20px; padding: 18px 0; }
 .rp-live-buttons .btn-us { background: var(--rp-OH); color: #fff; }
@@ -60,18 +59,15 @@ body { font-size: 15px; }
 .rp-inline-inputs .form-group { margin-bottom: 6px; }
 .rp-board-summary { display: flex; gap: 16px; align-items: baseline; margin-bottom: 8px; }
 .rp-board-summary strong { font-size: 20px; margin-left: 6px; }
-.rp-errors-inline { color: var(--rp-bad); font-weight: bold; }
 .rp-board-row { margin-bottom: 6px; }
 .rp-board-title { display: flex; gap: 12px; align-items: baseline; margin: 2px 0; }
 .rp-board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .rp-board-card { border: 1px solid #ddd; border-radius: 6px; padding: 4px 6px 6px; background: #fff; min-width: 0; }
-.rp-board-card.bad { border-color: var(--rp-bad); box-shadow: 0 0 0 1px var(--rp-bad); }
 .rp-board-head { display: flex; justify-content: space-between; align-items: center; }
 .rp-board-match { font-size: 15px; }
 .rp-board-match strong { font-size: 17px; }
 .rp-pill { border-radius: 10px; padding: 0 8px; font-size: 13px; font-weight: bold; }
 .rp-board-meta { color: #666; font-size: 11px; text-align: center; }
-.rp-board-errors { font-size: 11px; margin: 2px 0 0; padding-left: 14px; }
 .rp-board-reset { font-size: 12px; }
 .rp-court.compact .marker-label { font-size: 0.8px; }
 /* 12面が1画面に収まるよう、コートの高さを画面の高さから決める */
@@ -84,3 +80,12 @@ body { font-size: 15px; }
 .rp-dot.role-MB { background: var(--rp-MB); }
 .rp-dot.role-OP { background: var(--rp-OP); }
 .rp-dot.role-L { background: var(--rp-L); }
+
+/* レシーブ後の移動の矢印(役割の色) */
+.rp-court .move-arrow { stroke: #555; stroke-width: 0.13; stroke-dasharray: 0.35 0.2; opacity: 0.85; }
+.rp-court .move-arrow.role-S, .rp-court .arrowhead.role-S path { stroke: var(--rp-S); fill: var(--rp-S); }
+.rp-court .move-arrow.role-OH, .rp-court .arrowhead.role-OH path { stroke: var(--rp-OH); fill: var(--rp-OH); }
+.rp-court .move-arrow.role-MB, .rp-court .arrowhead.role-MB path { stroke: var(--rp-MB); fill: var(--rp-MB); }
+.rp-court .move-arrow.role-OP, .rp-court .arrowhead.role-OP path { stroke: var(--rp-OP); fill: var(--rp-OP); }
+.rp-court .move-arrow.role-L, .rp-court .arrowhead.role-L path { stroke: var(--rp-L); fill: var(--rp-L); }
+.rp-court .arrowhead path { stroke: none !important; }

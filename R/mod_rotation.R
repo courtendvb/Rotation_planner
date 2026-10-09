@@ -23,7 +23,7 @@ mod_rotation_ui <- function(id) {
         span(span(class = paste0("rp-dot role-", r)), ROLE_LEGEND[[r]])
       })),
       "下が自チーム、上が相手。初期表示は役割から作った標準のフォーメーションで、",
-      "選手をドラッグすると立ち位置を変更・保存できます(両チームとも)。赤枠はポジショナルフォルトです。"
+      "レシーブ側には攻撃位置への移動を矢印で示します。選手をドラッグすると立ち位置を変更・保存できます(両チームとも)。"
     )
   )
 }
@@ -71,7 +71,6 @@ mod_rotation_server <- function(id, teams, placements) {
           a = row$a, us = row$us, them = row$them, us_serving = us_srv,
           p_us = p[row$us + 1, row$them + 1, match(row$server, SIDES)],
           us_pl = us_pl, them_pl = them_pl,
-          us_v = check_overlap(us_pl, us_srv), them_v = check_overlap(them_pl, !us_srv),
           custom = !is.null(placements()[[placement_key(us(), row$us, us_srv)]]) ||
             !is.null(placements()[[placement_key(them(), row$them, !us_srv)]])
         )
@@ -114,15 +113,11 @@ mod_rotation_server <- function(id, teams, placements) {
 
     output$summary <- renderUI({
       st <- setup()
-      bs <- boards()
       win <- set_win_probability(prob(), st$us_start, st$them_start, st$first)
-      n_bad <- sum(vapply(bs, function(b) nrow(b$us_v) + nrow(b$them_v) > 0, logical(1)))
       div(
         class = "rp-board-summary",
         span("このスタートでのセット取得率(能力値)", strong(pct(win))),
-        if (n_bad == 0) span(class = "rp-ok", "12面すべて反則なし")
-        else span(class = "rp-errors-inline", sprintf("%d 面に反則があります", n_bad)),
-        if (any(vapply(bs, `[[`, logical(1), "custom")))
+        if (any(vapply(boards(), `[[`, logical(1), "custom")))
           actionLink(ns("reset_all"), "すべて標準のフォーメーションに戻す")
       )
     })
@@ -151,13 +146,14 @@ board_row <- function(ns, us, them, boards, phase, title, note) {
 }
 
 board_card <- function(ns, us, them, b, phase) {
-  bad <- nrow(b$us_v) + nrow(b$them_v) > 0
-  us_m <- team_markers(us, b$us, b$us_serving, b$us_pl, warn = unique(c(b$us_v$a, b$us_v$b)))
-  them_m <- team_markers(them, b$them, !b$us_serving, b$them_pl, warn = unique(c(b$them_v$a, b$them_v$b)))
-  violations <- c(if (nrow(b$us_v)) paste("自:", b$us_v$message), if (nrow(b$them_v)) paste("相:", b$them_v$message))
+  us_m <- team_markers(us, b$us, b$us_serving, b$us_pl)
+  them_m <- team_markers(them, b$them, !b$us_serving, b$them_pl)
+  # サイドアウト側(レシーブ側)は、レセプション位置から攻撃位置への矢印を描く
+  us_arrows <- if (!b$us_serving) transition_arrows(us, b$us, b$us_pl)
+  them_arrows <- if (b$us_serving) transition_arrows(them, b$them, b$them_pl)
 
   div(
-    class = paste("rp-board-card", if (bad) "bad"),
+    class = "rp-board-card",
     div(
       class = "rp-board-head",
       span(class = "rp-board-match", strong(rotation_label(us, b$us)), " vs ", rotation_label(them, b$them)),
@@ -166,8 +162,8 @@ board_card <- function(ns, us, them, b, phase) {
     div(class = "rp-board-meta",
         sprintf("前衛 自 %d 枚 / 相手 %d 枚", front_attacker_count(us, b$us), front_attacker_count(them, b$them))),
     court_svg(us_m, opponent = them_m, drag_input = ns("move"), compact = TRUE, max_width = 2000,
-              us_attrs = drag_attrs(b$us, b$us_serving), them_attrs = drag_attrs(b$them, !b$us_serving)),
-    if (length(violations)) tags$ul(class = "rp-errors rp-board-errors", lapply(violations, tags$li)),
+              us_attrs = drag_attrs(b$us, b$us_serving), them_attrs = drag_attrs(b$them, !b$us_serving),
+              us_arrows = us_arrows, them_arrows = them_arrows),
     if (b$custom) actionLink(ns(sprintf("reset_%s_%d", phase, b$a)), "標準に戻す", class = "rp-board-reset")
   )
 }

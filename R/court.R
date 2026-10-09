@@ -3,7 +3,7 @@
 # 1単位 = 1m。自チームは下側(ネットに向かって左→右が x)、相手は上側に 180° 回して描く。
 
 #' チームのローテーションをコート図のマーカー(data.frame)にする
-team_markers <- function(team, k, serving, placement = default_placement(), warn = integer()) {
+team_markers <- function(team, k, serving, placement = default_placement()) {
   cp <- court_players(team, k, serving)
   pl <- placement[match(1:6, placement$pos), ]
   data.frame(
@@ -12,8 +12,7 @@ team_markers <- function(team, k, serving, placement = default_placement(), warn
     y = pl$y,
     label = ifelse(is.na(cp$number), "?", as.character(cp$number)),
     sub = ifelse(is.na(cp$role), paste0("P", 1:6), paste0("P", 1:6, " ", cp$role)),
-    role = ifelse(is.na(cp$role), "none", cp$role),
-    warn = 1:6 %in% warn
+    role = ifelse(is.na(cp$role), "none", cp$role)
   )
 }
 
@@ -31,11 +30,32 @@ svg_escape <- function(x) {
 marker_svg <- function(m, mine, offset, draggable, attrs = "", compact = FALSE) {
   x <- if (mine) m$x else 9 - m$x
   y <- if (mine) offset + m$y else 9 - m$y
-  cls <- paste0("marker role-", m$role, if (m$warn) " warn", if (draggable) " draggable")
+  cls <- paste0("marker role-", m$role, if (draggable) " draggable")
   sub <- if (compact) "" else sprintf('<text class="marker-sub" y="0.98">%s</text>', svg_escape(m$sub))
   sprintf(
     '<g class="%s" data-pos="%d" data-side="%s"%s transform="translate(%.2f %.2f)"><circle r="%.2f"/><text class="marker-label" y="0.05">%s</text>%s</g>',
     cls, m$pos, if (mine) "us" else "them", attrs, x, y, if (compact) 0.7 else 0.62, svg_escape(m$label), sub
+  )
+}
+
+ARROW_ROLES <- c("S", "OH", "MB", "OP", "L", "none")
+
+# 矢じり(役割の色ごと)
+arrow_defs <- function() {
+  paste0("<defs>", paste(sprintf(
+    '<marker id="rp-arrow-%s" class="arrowhead role-%s" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>',
+    ARROW_ROLES, ARROW_ROLES), collapse = ""), "</defs>")
+}
+
+# 矢印(arrows はチームの自コート座標の data.frame(role, x1, y1, x2, y2))
+arrows_svg <- function(arrows, mine, offset) {
+  if (is.null(arrows) || nrow(arrows) == 0) return(character())
+  tx <- function(x) if (mine) x else 9 - x
+  ty <- function(y) if (mine) offset + y else 9 - y
+  role <- ifelse(arrows$role %in% ARROW_ROLES, arrows$role, "none")
+  sprintf(
+    '<line class="move-arrow role-%s" x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f" marker-end="url(#rp-arrow-%s)"/>',
+    role, tx(arrows$x1), ty(arrows$y1), tx(arrows$x2), ty(arrows$y2), role
   )
 }
 
@@ -52,8 +72,10 @@ drag_attrs <- function(rot, serving) {
 #'               NULL のチームはドラッグできない(自コートのみの図では自チームは常にドラッグ可)
 #'   court_key : 複数のコートを並べるときの識別子(ドラッグ結果の court に入る)
 #'   compact   : 小さく並べる用(ポジション名を省き、番号だけ表示)
+#'   us_arrows / them_arrows: 移動の矢印(transition_arrows() の結果)
 court_svg <- function(markers, opponent = NULL, drag_input = NULL, max_width = 440, court_key = NULL,
-                      us_attrs = NULL, them_attrs = NULL, compact = FALSE) {
+                      us_attrs = NULL, them_attrs = NULL, compact = FALSE,
+                      us_arrows = NULL, them_arrows = NULL) {
   full <- !is.null(opponent)
   offset <- if (full) 9 else 0
   height <- if (full) 18 else 9
@@ -76,9 +98,13 @@ court_svg <- function(markers, opponent = NULL, drag_input = NULL, max_width = 4
       marker_svg(ms[i, ], mine, offset, drag, if (drag) attrs %||% "" else "", compact)
     }, "")
   }
+  has_arrows <- !is.null(us_arrows) || !is.null(them_arrows)
   body <- c(
+    if (has_arrows) arrow_defs(),
     sprintf('<rect class="court-floor" x="0" y="0" width="9" height="%d"/>', height),
     lines,
+    arrows_svg(them_arrows, FALSE, offset),
+    arrows_svg(us_arrows, TRUE, offset),
     if (full) draw(opponent, FALSE, them_drag, them_attrs),
     draw(markers, TRUE, us_drag, us_attrs)
   )
