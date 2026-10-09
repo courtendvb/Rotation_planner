@@ -95,14 +95,34 @@ rally_prob_array <- function(us, them, settings = eval_settings()) {
   p
 }
 
-#' 実績(サイドアウト率・ブレイク率)で能力値モデルを置き換える。
-#' stats は rotation_stats() の結果。試行数 min_n 未満のローテーションは元の値のまま
-blend_with_stats <- function(p, stats, min_n = 5) {
-  for (a in 0:5) {
-    s <- stats[stats$rot == a, ]
-    if (nrow(s) == 0) next
-    if (s$receive >= min_n) p[a + 1, , "them"] <- s$side_out / s$receive
-    if (s$serve >= min_n) p[a + 1, , "us"] <- s$break_point / s$serve
+#' 実績(サイドアウト率・ブレイク率)を能力値モデルに混ぜる。
+#'   us_stats / them_stats: ローテーション(0〜5)別の実績(rotation_stats() の形)。NULL なら使わない
+#'   prior_n: 能力値を何本ぶんの実績とみなすか。実績が prior_n 本たまると能力値と半々になる
+#' 自チームのレシーブ時は「自チームのそのローテのサイドアウト率」と「相手のそのローテの
+#' ブレイクされなかった率」をそれぞれ能力値と混ぜてから平均する(サーブ時も同様)
+blend_with_stats <- function(p, us_stats = NULL, them_stats = NULL, prior_n = 10) {
+  shrink <- function(won, n, prior) (won + prior_n * prior) / (n + prior_n)
+  out <- p
+  for (a in 0:5) for (b in 0:5) {
+    us <- if (!is.null(us_stats)) us_stats[us_stats$rot == a, ]
+    th <- if (!is.null(them_stats)) them_stats[them_stats$rot == b, ]
+    # 自チームがレシーブ(相手サーブ)
+    p0 <- p[a + 1, b + 1, 2]
+    est <- c(if (!is.null(us) && nrow(us)) shrink(us$side_out, us$receive, p0),
+             if (!is.null(th) && nrow(th)) 1 - shrink(th$break_point, th$serve, 1 - p0))
+    if (length(est)) out[a + 1, b + 1, 2] <- mean(est)
+    # 自チームがサーブ
+    p0 <- p[a + 1, b + 1, 1]
+    est <- c(if (!is.null(us) && nrow(us)) shrink(us$break_point, us$serve, p0),
+             if (!is.null(th) && nrow(th)) 1 - shrink(th$side_out, th$receive, 1 - p0))
+    if (length(est)) out[a + 1, b + 1, 1] <- mean(est)
   }
-  p
+  out
+}
+
+#' 計算に使うラリー取得率:能力値モデルに実績(あれば)を混ぜたもの
+#'   actual: list(us, them)(ローテーション別の実績)または NULL
+model_prob_array <- function(us, them, actual = NULL, prior_n = 10, settings = eval_settings()) {
+  p <- rally_prob_array(us, them, settings)
+  if (is.null(actual)) p else blend_with_stats(p, actual$us, actual$them, prior_n)
 }

@@ -9,8 +9,7 @@ mod_matchup_ui <- function(id) {
         class = "rp-panel",
         radioButtons(ns("first_server"), "最初のサーブ", c("自チーム" = "us", "相手" = "them"), inline = TRUE),
         radioButtons(ns("target"), "セット", c("25点" = 25, "15点(第5セット)" = 15), inline = TRUE),
-        radioButtons(ns("model"), "ラリー取得率の根拠",
-                     c("能力値" = "rating", "能力値 + 試合の実績" = "stats")),
+        uiOutput(ns("model_note")),
         uiOutput(ns("them_starts")),
         sliderInput(ns("base_so"), "基準サイドアウト率", min = 0.4, max = 0.8, value = 0.6, step = 0.01),
         p(class = "rp-hint",
@@ -41,8 +40,8 @@ mod_matchup_ui <- function(id) {
   )
 }
 
-#' teams: list(us, them) の reactiveVal。logs: 試合の記録(ラリーの data.frame)を返す reactive
-mod_matchup_server <- function(id, teams, logs, placements = reactive(list())) {
+#' teams: list(us, them) の reactiveVal。actual / prior_n: 計算に混ぜる実績(データタブ)
+mod_matchup_server <- function(id, teams, placements = reactive(list()), actual = reactive(NULL), prior_n = reactive(10)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -51,6 +50,11 @@ mod_matchup_server <- function(id, teams, logs, placements = reactive(list())) {
     target <- reactive(as.integer(input$target))
 
     rot_choices <- function(team) setNames(0:5, vapply(0:5, function(i) rotation_label(team, i), ""))
+
+    output$model_note <- renderUI({
+      p(class = "rp-hint", strong("ラリー取得率の根拠: "),
+        if (is.null(actual())) "能力値のみ" else "能力値 + 実績(データタブで切り替え)")
+    })
 
     output$them_starts <- renderUI({
       checkboxGroupInput(ns("them_likely"), "相手が来そうなスタート", rot_choices(them()),
@@ -62,8 +66,7 @@ mod_matchup_server <- function(id, teams, logs, placements = reactive(list())) {
     })
 
     prob <- reactive({
-      p <- rally_prob_array(us(), them(), settings())
-      if (identical(input$model, "stats")) p <- blend_with_stats(p, rotation_stats(logs()))
+      p <- model_prob_array(us(), them(), actual(), prior_n(), settings())
       p
     })
     mat <- reactive(start_matrix(prob(), input$first_server, target()))

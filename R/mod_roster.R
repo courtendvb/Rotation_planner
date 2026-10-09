@@ -32,7 +32,10 @@ mod_roster_server <- function(id, teams, key) {
       teams(all)
     }
 
-    observe(updateTextInput(session, "name", value = isolate(team()$name)))
+    # チーム名が外から変わったとき(.dvw の読み込みなど)も入力欄を合わせる
+    observeEvent(team()$name, {
+      if (!identical(input$name, team()$name)) updateTextInput(session, "name", value = team()$name)
+    })
     observeEvent(input$name, {
       if (nzchar(input$name) && input$name != team()$name) set_team(modifyList(team(), list(name = input$name)))
     }, ignoreInit = TRUE)

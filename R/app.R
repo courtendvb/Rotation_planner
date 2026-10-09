@@ -16,7 +16,8 @@ app_ui <- function() {
     tabPanel("チーム", fluidRow(column(6, mod_roster_ui("us")), column(6, mod_roster_ui("them")))),
     tabPanel("ローテーション", mod_rotation_ui("rotation")),
     tabPanel("マッチアップ", mod_matchup_ui("matchup")),
-    tabPanel("試合", mod_live_ui("live"))
+    tabPanel("試合", mod_live_ui("live")),
+    tabPanel("データ", mod_data_ui("data"))
   )
 }
 
@@ -26,9 +27,15 @@ app_server <- function(input, output, session) {
 
   mod_roster_server("us", teams, "us")
   mod_roster_server("them", teams, "them")
-  mod_rotation_server("rotation", teams, placements)
-  logs <- mod_live_server("live", teams, placements)
-  mod_matchup_server("matchup", teams, logs, placements)
+  # 実績(データタブで選んだもの)。試合タブの記録を使う場合があるので、参照は実行時に解決する
+  data <- NULL
+  actual <- reactive(data$actual())
+  prior_n <- reactive(data$prior_n())
+
+  mod_rotation_server("rotation", teams, placements, actual, prior_n)
+  logs <- mod_live_server("live", teams, placements, actual, prior_n)
+  mod_matchup_server("matchup", teams, placements, actual, prior_n)
+  data <- mod_data_server("data", teams, logs)
 }
 
 #' アプリを起動する。

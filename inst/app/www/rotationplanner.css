@@ -75,7 +75,7 @@ body { font-size: 15px; }
 .rp-board-reset { font-size: 12px; }
 .rp-court.compact .marker-label { font-size: 0.8px; }
 /* 12面が1画面に収まるよう、コートの高さを画面の高さから決める */
-.rp-board-card .rp-court { width: 100%; height: calc((100vh - 350px) / 2); min-height: 200px; }
+.rp-board-card .rp-court { width: 100%; height: calc((100vh - 380px) / 2); min-height: 200px; }
 .rp-board-row:first-of-type { margin-top: 0; }
 .rp-legend { display: inline-flex; gap: 10px; margin-right: 12px; }
 .rp-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
@@ -93,3 +93,11 @@ body { font-size: 15px; }
 .rp-court .move-arrow.role-OP, .rp-court .arrowhead.role-OP path { stroke: var(--rp-OP); fill: var(--rp-OP); }
 .rp-court .move-arrow.role-L, .rp-court .arrowhead.role-L path { stroke: var(--rp-L); fill: var(--rp-L); }
 .rp-court .arrowhead path { stroke: none !important; }
+
+/* データタブ */
+.rp-errors-text { color: var(--rp-bad); }
+.rp-live-dot { margin-left: 10px; color: var(--rp-good); font-weight: normal; font-size: 12px; }
+.rp-live-dot::before { content: "● "; }
+.rp-stats-table td, .rp-stats-table th { white-space: nowrap; }
+.rp-stats-table .rp-total td { font-weight: bold; border-top: 2px solid #ccc; }
+.rp-board-actual { color: #444; }

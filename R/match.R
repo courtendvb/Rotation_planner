@@ -55,18 +55,21 @@ undo_rally <- function(record) {
   record
 }
 
-#' 自チームのローテーション別のサイドアウト・ブレイクの集計
+#' ローテーション別のサイドアウト・ブレイクの集計(side = "us" なら自チーム、"them" なら相手)
 #'   receive / side_out    : レシーブしたラリー数 / そのうち取った数
 #'   serve   / break_point : サーブしたラリー数 / そのうち取った数
-rotation_stats <- function(log) {
+rotation_stats <- function(log, side = "us") {
   rot <- 0:5
-  recv <- log[log$server == "them", , drop = FALSE]
-  srv <- log[log$server == "us", , drop = FALSE]
+  other <- setdiff(SIDES, side)
+  r <- log[[side]]
+  recv <- log$server == other
+  srv <- log$server == side
+  won <- log$winner == side
   data.frame(
     rot = rot,
-    receive = vapply(rot, function(r) sum(recv$us == r), numeric(1)),
-    side_out = vapply(rot, function(r) sum(recv$us == r & recv$winner == "us"), numeric(1)),
-    serve = vapply(rot, function(r) sum(srv$us == r), numeric(1)),
-    break_point = vapply(rot, function(r) sum(srv$us == r & srv$winner == "us"), numeric(1))
+    receive = vapply(rot, function(k) sum(recv & r == k), numeric(1)),
+    side_out = vapply(rot, function(k) sum(recv & won & r == k), numeric(1)),
+    serve = vapply(rot, function(k) sum(srv & r == k), numeric(1)),
+    break_point = vapply(rot, function(k) sum(srv & won & r == k), numeric(1))
   )
 }

@@ -10,7 +10,8 @@ mod_live_ui <- function(id) {
 
 #' teams: list(us, them) の reactiveVal。placements: 保存した立ち位置の reactive
 #' 戻り値: これまでの全ラリー(終了したセット + 進行中のセット)の data.frame を返す reactive
-mod_live_server <- function(id, teams, placements = reactive(list())) {
+mod_live_server <- function(id, teams, placements = reactive(list()),
+                            actual = reactive(NULL), prior_n = reactive(10)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -134,7 +135,7 @@ mod_live_server <- function(id, teams, placements = reactive(list())) {
 
     output$now <- renderUI({
       s <- state()
-      ev <- evaluate_pairing(us(), them(), s$us_rot, s$them_rot, s$server)
+      p <- model_prob_array(us(), them(), actual(), prior_n())[s$us_rot + 1, s$them_rot + 1, match(s$server, SIDES)]
       # 次にサイドアウトが起きたときの対面
       next_us <- if (s$server == "us") s$us_rot else (s$us_rot + 1) %% 6
       next_them <- if (s$server == "them") s$them_rot else (s$them_rot + 1) %% 6
@@ -144,8 +145,8 @@ mod_live_server <- function(id, teams, placements = reactive(list())) {
         tags$dt("いまの対面"),
         tags$dd(sprintf("%s vs %s(%sサーブ)", rotation_label(us(), s$us_rot), rotation_label(them(), s$them_rot),
                         if (s$server == "us") "自チーム" else "相手")),
-        tags$dt("このラリーを取る見込み(能力値)"),
-        tags$dd(pct(ev$p_us)),
+        tags$dt(if (is.null(actual())) "このラリーを取る見込み(能力値)" else "このラリーを取る見込み(能力値+実績)"),
+        tags$dd(pct(p)),
         tags$dt("サイドアウトされた後の対面"),
         tags$dd(sprintf("%s vs %s(%sサーブ)", rotation_label(us(), next_us), rotation_label(them(), next_them),
                         if (next_server == "us") "自チーム" else "相手"))

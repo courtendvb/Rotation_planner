@@ -45,3 +45,13 @@ test_that("サイドアウトとブレイクを分けて集計する", {
   expect_equal(unlist(st[1, -1]), c(receive = 1, side_out = 1, serve = 0, break_point = 0))
   expect_equal(unlist(st[2, -1]), c(receive = 0, side_out = 0, serve = 2, break_point = 1))
 })
+
+test_that("相手側の集計もできる", {
+  s <- replay_set(play(new_set(0, 0, "them"), c("us", "us", "them")))
+  st <- rotation_stats(s$log, "them")
+  # 相手はローテ0でサーブ2本(1本ブレイク... 1本目は失点、3本目は...)
+  expect_equal(sum(st$serve) + sum(st$receive), 3)
+  expect_equal(st$serve[1], 1)       # 1本目:相手サーブ、自チームがサイドアウト
+  expect_equal(st$receive[1], 2)     # 2・3本目:自チームサーブを相手がレシーブ
+  expect_equal(st$side_out[1], 1)
+})
