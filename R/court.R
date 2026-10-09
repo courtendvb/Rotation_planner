@@ -28,27 +28,38 @@ svg_escape <- function(x) {
   gsub(">", "&gt;", x, fixed = TRUE)
 }
 
-marker_svg <- function(m, mine, offset, draggable) {
+marker_svg <- function(m, mine, offset, draggable, attrs = "", compact = FALSE) {
   x <- if (mine) m$x else 9 - m$x
   y <- if (mine) offset + m$y else 9 - m$y
   cls <- paste0("marker role-", m$role, if (m$warn) " warn", if (draggable) " draggable")
+  sub <- if (compact) "" else sprintf('<text class="marker-sub" y="0.98">%s</text>', svg_escape(m$sub))
   sprintf(
-    '<g class="%s" data-pos="%d" transform="translate(%.2f %.2f)"><circle r="0.62"/><text class="marker-label" y="0.05">%s</text><text class="marker-sub" y="0.98">%s</text></g>',
-    cls, m$pos, x, y, svg_escape(m$label), svg_escape(m$sub)
+    '<g class="%s" data-pos="%d" data-side="%s"%s transform="translate(%.2f %.2f)"><circle r="%.2f"/><text class="marker-label" y="0.05">%s</text>%s</g>',
+    cls, m$pos, if (mine) "us" else "them", attrs, x, y, if (compact) 0.7 else 0.62, svg_escape(m$label), sub
   )
+}
+
+#' ドラッグ時に送る情報(data 属性)
+drag_attrs <- function(rot, serving) {
+  sprintf(' data-rot="%d" data-phase="%s"', as.integer(rot), if (serving) "serve" else "receive")
 }
 
 #' コート図を作る。
 #'   markers   : 自チームのマーカー
 #'   opponent  : 相手のマーカー(NULL なら自コートのみ)
 #'   drag_input: ドラッグ結果を受け取る Shiny の input id(NULL ならドラッグ不可)
+#'   us_attrs / them_attrs: ドラッグ可能にするチームのマーカーに付ける data 属性(drag_attrs())。
+#'               NULL のチームはドラッグできない(自コートのみの図では自チームは常にドラッグ可)
 #'   court_key : 複数のコートを並べるときの識別子(ドラッグ結果の court に入る)
-court_svg <- function(markers, opponent = NULL, drag_input = NULL, max_width = 440, court_key = NULL) {
+#'   compact   : 小さく並べる用(ポジション名を省き、番号だけ表示)
+court_svg <- function(markers, opponent = NULL, drag_input = NULL, max_width = 440, court_key = NULL,
+                      us_attrs = NULL, them_attrs = NULL, compact = FALSE) {
   full <- !is.null(opponent)
   offset <- if (full) 9 else 0
   height <- if (full) 18 else 9
-  margin <- 1.2
-  bottom <- 1.9  # エンドラインの外に立つサーバーの表示ぶん
+  side_margin <- if (compact) 0.8 else 1.2
+  top <- if (full) 1.5 else 1.2  # 相手のサーバーの表示ぶん
+  bottom <- 1.9                  # エンドラインの外に立つサーバーの表示ぶん
   lines <- if (full) {
     c('<line class="court-line" x1="0" x2="9" y1="6" y2="6"/>',
       '<line class="court-line" x1="0" x2="9" y1="12" y2="12"/>',
@@ -57,17 +68,25 @@ court_svg <- function(markers, opponent = NULL, drag_input = NULL, max_width = 4
     c('<line class="court-line" x1="0" x2="9" y1="3" y2="3"/>',
       '<line class="court-net" x1="-0.6" x2="9.6" y1="0" y2="0"/>')
   }
-  draggable <- !is.null(drag_input)
+  has_input <- !is.null(drag_input)
+  us_drag <- has_input && (!full || !is.null(us_attrs))
+  them_drag <- has_input && full && !is.null(them_attrs)
+  draw <- function(ms, mine, drag, attrs) {
+    vapply(seq_len(nrow(ms)), function(i) {
+      marker_svg(ms[i, ], mine, offset, drag, if (drag) attrs %||% "" else "", compact)
+    }, "")
+  }
   body <- c(
     sprintf('<rect class="court-floor" x="0" y="0" width="9" height="%d"/>', height),
     lines,
-    if (full) vapply(seq_len(nrow(opponent)), function(i) marker_svg(opponent[i, ], FALSE, offset, FALSE), ""),
-    vapply(seq_len(nrow(markers)), function(i) marker_svg(markers[i, ], TRUE, offset, draggable), "")
+    if (full) draw(opponent, FALSE, them_drag, them_attrs),
+    draw(markers, TRUE, us_drag, us_attrs)
   )
   HTML(sprintf(
-    '<svg class="rp-court" viewBox="%.1f %.1f %.1f %.1f" style="max-width:%dpx" data-offset="%d"%s>%s</svg>',
-    -margin, -margin, 9 + 2 * margin, height + margin + bottom, max_width, offset,
-    paste0(if (draggable) sprintf(' data-input="%s"', drag_input) else "",
+    '<svg class="rp-court%s" viewBox="%.1f %.1f %.1f %.1f" style="max-width:%dpx" data-offset="%d"%s>%s</svg>',
+    if (compact) " compact" else "",
+    -side_margin, -top, 9 + 2 * side_margin, height + top + bottom, max_width, offset,
+    paste0(if (has_input) sprintf(' data-input="%s"', drag_input) else "",
            if (!is.null(court_key)) sprintf(' data-court="%s"', court_key) else ""),
     paste(body, collapse = "")
   ))

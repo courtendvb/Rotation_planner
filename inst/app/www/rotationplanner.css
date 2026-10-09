@@ -54,13 +54,33 @@ body { font-size: 15px; }
 .rp-facts dt { color: #666; font-weight: normal; }
 .rp-facts dd { margin-bottom: 8px; font-weight: bold; }
 
-/* ローテーション一覧(6コート) */
-.rp-rot-card { border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; margin-bottom: 16px; background: #fff; }
-.rp-rot-card.bad { border-color: var(--rp-bad); box-shadow: 0 0 0 1px var(--rp-bad); }
-.rp-rot-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
-.rp-rot-label { font-size: 22px; font-weight: bold; }
-.rp-rot-meta { color: #555; font-size: 13px; }
-.rp-rot-custom { margin-left: auto; font-size: 12px; color: #8a6d00; background: #fff4cc; border-radius: 3px; padding: 0 6px; }
-.rp-rot-card .rp-court { margin: 0 auto; }
-.rp-rot-foot { min-height: 52px; }
-.rp-rot-foot .rp-errors { margin: 0; }
+/* ローテーション対面ボード(12コート) */
+.rp-board-controls { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.rp-inline-inputs { display: flex; gap: 16px; align-items: flex-end; }
+.rp-inline-inputs .form-group { margin-bottom: 6px; }
+.rp-board-summary { display: flex; gap: 16px; align-items: baseline; margin-bottom: 8px; }
+.rp-board-summary strong { font-size: 20px; margin-left: 6px; }
+.rp-errors-inline { color: var(--rp-bad); font-weight: bold; }
+.rp-board-row { margin-bottom: 6px; }
+.rp-board-title { display: flex; gap: 12px; align-items: baseline; margin: 2px 0; }
+.rp-board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.rp-board-card { border: 1px solid #ddd; border-radius: 6px; padding: 4px 6px 6px; background: #fff; min-width: 0; }
+.rp-board-card.bad { border-color: var(--rp-bad); box-shadow: 0 0 0 1px var(--rp-bad); }
+.rp-board-head { display: flex; justify-content: space-between; align-items: center; }
+.rp-board-match { font-size: 15px; }
+.rp-board-match strong { font-size: 17px; }
+.rp-pill { border-radius: 10px; padding: 0 8px; font-size: 13px; font-weight: bold; }
+.rp-board-meta { color: #666; font-size: 11px; text-align: center; }
+.rp-board-errors { font-size: 11px; margin: 2px 0 0; padding-left: 14px; }
+.rp-board-reset { font-size: 12px; }
+.rp-court.compact .marker-label { font-size: 0.8px; }
+/* 12面が1画面に収まるよう、コートの高さを画面の高さから決める */
+.rp-board-card .rp-court { width: 100%; height: calc((100vh - 350px) / 2); min-height: 200px; }
+.rp-board-row:first-of-type { margin-top: 0; }
+.rp-legend { display: inline-flex; gap: 10px; margin-right: 12px; }
+.rp-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+.rp-dot.role-S { background: var(--rp-S); }
+.rp-dot.role-OH { background: var(--rp-OH); }
+.rp-dot.role-MB { background: var(--rp-MB); }
+.rp-dot.role-OP { background: var(--rp-OP); }
+.rp-dot.role-L { background: var(--rp-L); }
