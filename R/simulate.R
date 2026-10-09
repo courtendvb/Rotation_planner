@@ -56,6 +56,13 @@ set_win_all_states <- function(p, target = 25) {
   V[[1]][[1]]
 }
 
+#' セット終了の判定。終わっていれば勝者("us" / "them")、続いていれば NA
+set_winner <- function(us, them, target) {
+  if (us >= target && us - them >= 2) return("us")
+  if (them >= target && them - us >= 2) return("them")
+  NA_character_
+}
+
 #' 1つのスタートの組み合わせのセット取得確率
 set_win_probability <- function(p, us_start, them_start, first_server, target = 25) {
   s <- match(first_server, SIDES)

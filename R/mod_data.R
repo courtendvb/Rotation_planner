@@ -29,7 +29,7 @@ mod_data_ui <- function(id) {
         p(class = "rp-hint",
           "チーム名、選手(背番号・名前・役割)、スタートの並び、リベロを読み込みます。",
           "役割が入っていない選手は、セッターの宣言・プレー内容・並びから推定します。",
-          "能力値は、背番号が同じ選手の値を引き継ぎます。")
+          "ドラッグで変えた立ち位置は、読み込むと標準のフォーメーションに戻ります。")
       )
     ),
     column(
@@ -37,9 +37,7 @@ mod_data_ui <- function(id) {
       div(
         class = "rp-panel",
         h4("サイドアウト率(実績)"),
-        radioButtons(ns("source"), "マッチアップの計算に使う実績",
-                     c("DataVolley(.dvw)" = "dvw", "試合タブの記録" = "live", "使わない(能力値のみ)" = "none")),
-        sliderInput(ns("prior_n"), "能力値の重み(実績が何本たまったら半々にするか)",
+        sliderInput(ns("prior_n"), "実績の少ない対面の補正(何本たまったら、その対面の実績を半分信頼するか)",
                     min = 2, max = 40, value = 10, step = 1),
         uiOutput(ns("stats"))
       )
@@ -47,12 +45,12 @@ mod_data_ui <- function(id) {
   )
 }
 
-#' teams: list(us, them) の reactiveVal。logs: 試合タブの全ラリーを返す reactive。
-#' 戻り値 list(actual = 実績 list(us, them) または NULL を返す reactive, prior_n = reactive)
-mod_data_server <- function(id, teams, logs) {
+#' teams: list(us, them) の reactiveVal。placements: 立ち位置を保存する reactiveVal。
+#' 戻り値 list(stats = 対面別の実績(matchup_stats())を返す reactive, has_data = reactive, prior_n = reactive)
+mod_data_server <- function(id, teams, placements) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    settings <- stored_reactive_val("data_settings", list(path = "", our_side = "home", source = "dvw", prior_n = 10))
+    settings <- stored_reactive_val("data_settings", list(path = "", our_side = "home", prior_n = 10))
     dvw <- reactiveVal(NULL)
     watched <- reactiveVal(NULL)   # 自動で読み直すファイルのパス
     error <- reactiveVal(NULL)
@@ -62,7 +60,6 @@ mod_data_server <- function(id, teams, logs) {
       s <- isolate(settings())
       updateTextInput(session, "path", value = s$path)
       updateRadioButtons(session, "our_side", selected = s$our_side)
-      updateRadioButtons(session, "source", selected = s$source)
       updateSliderInput(session, "prior_n", value = s$prior_n)
       if (nzchar(s$path) && file.exists(s$path)) load_file(s$path, watch = TRUE)
     }) |> bindEvent(TRUE, once = TRUE)
@@ -70,7 +67,7 @@ mod_data_server <- function(id, teams, logs) {
     observe({
       s <- settings()
       new <- list(path = input$path %||% s$path, our_side = input$our_side %||% s$our_side,
-                  source = input$source %||% s$source, prior_n = input$prior_n %||% s$prior_n)
+                  prior_n = input$prior_n %||% s$prior_n)
       if (!identical(new, s)) settings(new)
     })
 
@@ -104,7 +101,10 @@ mod_data_server <- function(id, teams, logs) {
       path <- watched()
       d <- isolate(dvw())
       req(isTRUE(input$watch), !is.null(path), file.exists(path))
-      if (is.null(d) || !identical(file.mtime(path), d$mtime)) load_file(path, watch = TRUE)
+      # 更新時刻とサイズの両方を見る(保存中の書きかけを読んだ後も、次の確認で読み直せるように)
+      if (is.null(d) || !identical(file.mtime(path), d$mtime) || !identical(file.size(path), d$size)) {
+        load_file(path, watch = TRUE)
+      }
     })
 
     output$status <- renderUI({
@@ -136,35 +136,24 @@ mod_data_server <- function(id, teams, logs) {
       ours <- input$our_side
       theirs <- setdiff(DVW_SIDES, ours)
       set <- as.integer(input$set %||% 1)
-      cur <- teams()
-      teams(list(us = dvw_team(d, ours, existing = cur$us, team_id = "us", set = set),
-                 them = dvw_team(d, theirs, existing = cur$them, team_id = "them", set = set)))
+      teams(list(us = dvw_team(d, ours, team_id = "us", set = set),
+                 them = dvw_team(d, theirs, team_id = "them", set = set)))
+      # 前のチームで保存した立ち位置は、新しいメンバーには当てはまらないので消す
+      placements(list())
       showNotification(sprintf("%s と %s のメンバーを読み込みました", d$teams[[ours]], d$teams[[theirs]]),
                        type = "message")
     })
 
-    actual <- reactive({
-      src <- input$source %||% "none"
-      if (src == "dvw") {
-        d <- dvw()
-        if (is.null(d)) return(NULL)
-        ours <- input$our_side %||% "home"
-        list(us = setter_stats_to_rotation(dvw_setter_stats(d, ours), teams()$us),
-             them = setter_stats_to_rotation(dvw_setter_stats(d, setdiff(DVW_SIDES, ours)), teams()$them))
-      } else if (src == "live") {
-        l <- logs()
-        list(us = rotation_stats(l, "us"), them = rotation_stats(l, "them"))
-      } else {
-        NULL
-      }
+    stats <- reactive({
+      d <- dvw()
+      if (is.null(d)) return(empty_matchup_stats())
+      matchup_stats(d$rallies, input$our_side %||% "home", teams()$us, teams()$them)
     })
+    has_data <- reactive(sum(stats()$n) > 0)
 
     output$stats <- renderUI({
-      a <- actual()
-      if (is.null(a)) {
-        return(p(class = "rp-hint", if (identical(input$source, "dvw")) "DataVolley のファイルを読み込むと表示します。"
-                 else "能力値だけで計算しています。"))
-      }
+      if (!has_data()) return(p(class = "rp-hint", "DataVolley のファイルを読み込むと表示します。"))
+      ms <- stats()
       rate <- function(won, n) ifelse(n == 0, "—", sprintf("%s (%d/%d)", pct(won / n, 0), won, n))
       tbl <- function(team, st) {
         tags$table(
@@ -180,10 +169,13 @@ mod_data_server <- function(id, teams, logs) {
                   tags$td(rate(sum(st$break_point), sum(st$serve))))
         )
       }
-      tagList(fluidRow(column(6, tbl(teams()$us, a$us)), column(6, tbl(teams()$them, a$them))),
-              p(class = "rp-hint", "ローテーションタブ・マッチアップタブ・試合タブの見込みは、この実績と能力値を混ぜて計算します。"))
+      tagList(
+        fluidRow(column(6, tbl(teams()$us, rotation_summary(ms, "us"))),
+                 column(6, tbl(teams()$them, rotation_summary(ms, "them")))),
+        p(class = "rp-hint", "ローテーションタブとマッチアップタブの見込みは、この実績(対面ごとの実績)から計算します。")
+      )
     })
 
-    list(actual = actual, prior_n = reactive(input$prior_n %||% 10))
+    list(stats = stats, has_data = has_data, prior_n = reactive(input$prior_n %||% 10))
   })
 }

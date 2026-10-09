@@ -53,32 +53,3 @@ test_that("rank_starts は期待値の高い順", {
   expect_equal(r$us_start[1], 2)
   expect_equal(r$worst[1], 0.9)
 })
-
-test_that("能力値モデル:スタートの組み合わせで勝率が変わる", {
-  t <- sample_teams()
-  p <- rally_prob_array(t$us, t$them)
-  expect_true(all(p > 0 & p < 1))
-  m <- start_matrix(p, "us")
-  expect_gt(max(m) - min(m), 0)
-  ev <- evaluate_pairing(t$us, t$them, 0, 0, "them")
-  expect_equal(sign(ev$p_us - 0.6), sign(ev$edge))
-})
-
-test_that("実績の混ぜ方:実績がなければ能力値のまま、たまるほど実績に近づく", {
-  p <- array(0.5, dim = c(6, 6, 2))
-  none <- data.frame(rot = 0:5, receive = 0, side_out = 0, serve = 0, break_point = 0)
-  expect_equal(blend_with_stats(p, none, none), p)
-  few <- none; few$receive[1] <- 4; few$side_out[1] <- 4
-  many <- none; many$receive[1] <- 100; many$side_out[1] <- 100
-  p_few <- blend_with_stats(p, few)[1, 1, 2]
-  p_many <- blend_with_stats(p, many)[1, 1, 2]
-  expect_gt(p_few, 0.5)
-  expect_gt(p_many, p_few)
-  expect_gt(p_many, 0.95)
-  # 他のローテーションやサーブ時には影響しない
-  expect_equal(blend_with_stats(p, many)[2, 1, 2], 0.5)
-  expect_equal(blend_with_stats(p, many)[1, 1, 1], 0.5)
-  # 相手の実績:相手がローテ0でブレイクされやすい → 自チームのレシーブが有利に
-  th <- none; th$serve[1] <- 50; th$break_point[1] <- 0
-  expect_gt(blend_with_stats(p, NULL, th)[3, 1, 2], 0.75)
-})

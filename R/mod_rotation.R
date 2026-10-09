@@ -29,8 +29,9 @@ mod_rotation_ui <- function(id) {
 }
 
 #' teams: list(us, them) の reactiveVal。placements: 立ち位置を保存する reactiveVal。
-#' actual / prior_n: 計算に混ぜる実績(データタブ)
-mod_rotation_server <- function(id, teams, placements, actual = reactive(NULL), prior_n = reactive(10)) {
+#' stats / has_data / prior_n: 対面別の実績(データタブ)
+mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_matchup_stats()),
+                                has_data = reactive(FALSE), prior_n = reactive(10)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -55,13 +56,14 @@ mod_rotation_server <- function(id, teams, placements, actual = reactive(NULL), 
       list(us_start = as.integer(input$us_start), them_start = as.integer(input$them_start),
            first = input$first_server)
     })
-    prob <- reactive(model_prob_array(us(), them(), actual(), prior_n()))
+    prob <- reactive(rally_prob_from_stats(stats(), prior_n()))
 
     # 12 の対面と、それぞれの立ち位置・ラリー取得率
     boards <- reactive({
       st <- setup()
       pr <- pairings_for_set(st$us_start, st$them_start, st$first)
       p <- prob()
+      ms <- stats()
       pr$a <- rep(0:5, each = 2)
       lapply(seq_len(nrow(pr)), function(i) {
         row <- pr[i, ]
@@ -71,6 +73,7 @@ mod_rotation_server <- function(id, teams, placements, actual = reactive(NULL), 
         list(
           a = row$a, us = row$us, them = row$them, us_serving = us_srv,
           p_us = p[row$us + 1, row$them + 1, match(row$server, SIDES)],
+          record = ms[ms$us == row$us & ms$them == row$them & ms$server == row$server, c("n", "won")],
           us_pl = us_pl, them_pl = them_pl,
           custom = !is.null(placements()[[placement_key(us(), row$us, us_srv)]]) ||
             !is.null(placements()[[placement_key(them(), row$them, !us_srv)]])
@@ -114,11 +117,14 @@ mod_rotation_server <- function(id, teams, placements, actual = reactive(NULL), 
 
     output$summary <- renderUI({
       st <- setup()
-      win <- set_win_probability(prob(), st$us_start, st$them_start, st$first)
       div(
         class = "rp-board-summary",
-        span(if (is.null(actual())) "このスタートでのセット取得率(能力値)" else "このスタートでのセット取得率(能力値+実績)",
-             strong(pct(win))),
+        if (has_data()) {
+          win <- set_win_probability(prob(), st$us_start, st$them_start, st$first)
+          span("このスタートでのセット取得率(実績から推定)", strong(pct(win)))
+        } else {
+          span(class = "rp-hint", "データタブで .dvw を読み込むと、実績と見込みを表示します。")
+        },
         if (any(vapply(boards(), `[[`, logical(1), "custom")))
           actionLink(ns("reset_all"), "すべて標準のフォーメーションに戻す")
       )
@@ -126,61 +132,59 @@ mod_rotation_server <- function(id, teams, placements, actual = reactive(NULL), 
 
     output$board <- renderUI({
       bs <- boards()
+      data <- has_data()
       serve <- Filter(function(b) b$us_serving, bs)
       receive <- Filter(function(b) !b$us_serving, bs)
-      avg <- function(xs) mean(vapply(xs, `[[`, 0, "p_us"))
+      note <- function(xs, label) {
+        if (!data) return(NULL)
+        n <- sum(vapply(xs, function(b) b$record$n, 0))
+        won <- sum(vapply(xs, function(b) b$record$won, 0))
+        sprintf("この12通りの対面の実績 %s %s", label, if (n == 0) "—" else sprintf("%s (%d/%d)", pct(won / n, 0), won, n))
+      }
       tagList(
-        board_row(ns, us(), them(), serve, "serve", actual(),
-                  "自チームサーブ(ブレイクフェイズ)", sprintf("ブレイク見込み 平均 %s", pct(avg(serve)))),
-        board_row(ns, us(), them(), receive, "receive", actual(),
-                  "自チームレセプション(サイドアウトフェイズ)", sprintf("サイドアウト見込み 平均 %s", pct(avg(receive))))
+        board_row(ns, us(), them(), serve, "serve", data, "自チームサーブ(ブレイクフェイズ)", note(serve, "ブレイク")),
+        board_row(ns, us(), them(), receive, "receive", data, "自チームレセプション(サイドアウトフェイズ)",
+                  note(receive, "サイドアウト"))
       )
     })
   })
 }
 
-board_row <- function(ns, us, them, boards, phase, actual, title, note) {
+board_row <- function(ns, us, them, boards, phase, data, title, note) {
   div(
     class = "rp-board-row",
     div(class = "rp-board-title", strong(title), span(class = "rp-hint", note)),
-    div(class = "rp-board", lapply(boards, function(b) board_card(ns, us, them, b, phase, actual)))
+    div(class = "rp-board", lapply(boards, function(b) board_card(ns, us, them, b, phase, data)))
   )
 }
 
-# 実績の一行(例:「実績 自SO 7/9・相BP 6/13」)
-actual_line <- function(actual, b) {
-  if (is.null(actual)) return(NULL)
-  u <- actual$us[actual$us$rot == b$us, ]
-  t <- actual$them[actual$them$rot == b$them, ]
-  frac <- function(w, n) if (n == 0) "—" else sprintf("%d/%d", as.integer(w), as.integer(n))
-  txt <- if (b$us_serving) {
-    sprintf("実績 自BP %s・相SO %s", frac(u$break_point, u$serve), frac(t$side_out, t$receive))
-  } else {
-    sprintf("実績 自SO %s・相BP %s", frac(u$side_out, u$receive), frac(t$break_point, t$serve))
-  }
-  div(class = "rp-board-meta rp-board-actual", txt)
-}
-
-board_card <- function(ns, us, them, b, phase, actual = NULL) {
+board_card <- function(ns, us, them, b, phase, data = FALSE) {
   us_m <- team_markers(us, b$us, b$us_serving, b$us_pl)
   them_m <- team_markers(them, b$them, !b$us_serving, b$them_pl)
   # サイドアウト側(レシーブ側)は、レセプション位置から攻撃位置への矢印を描く
   us_arrows <- if (!b$us_serving) transition_arrows(us, b$us, b$us_pl)
   them_arrows <- if (b$us_serving) transition_arrows(them, b$them, b$them_pl)
+  # 見込みの色は、その局面の一般的な値(サーブ側 40% / レシーブ側 60%)との差で付ける
+  baseline <- if (b$us_serving) 1 - DEFAULT_SIDE_OUT else DEFAULT_SIDE_OUT
+  rec <- b$record
+  label <- if (b$us_serving) "自BP" else "自SO"
 
   div(
     class = "rp-board-card",
     div(
       class = "rp-board-head",
       span(class = "rp-board-match", strong(rotation_label(us, b$us)), " vs ", rotation_label(them, b$them)),
-      span(class = "rp-pill", style = sprintf("background:%s", prob_color(b$p_us)), pct(b$p_us, 0))
+      if (data) span(class = "rp-pill", title = "実績からの見込み",
+                     style = sprintf("background:%s", prob_color(b$p_us - baseline + 0.5)), pct(b$p_us, 0))
     ),
     div(class = "rp-board-meta",
         sprintf("前衛 自 %d 枚 / 相手 %d 枚", front_attacker_count(us, b$us), front_attacker_count(them, b$them))),
     court_svg(us_m, opponent = them_m, drag_input = ns("move"), compact = TRUE, max_width = 2000,
               us_attrs = drag_attrs(b$us, b$us_serving), them_attrs = drag_attrs(b$them, !b$us_serving),
               us_arrows = us_arrows, them_arrows = them_arrows),
-    actual_line(actual, b),
+    if (data) div(class = "rp-board-meta rp-board-actual",
+                  sprintf("この対面の実績 %s %s", label,
+                          if (rec$n == 0) "なし" else sprintf("%d/%d", as.integer(rec$won), as.integer(rec$n)))),
     if (b$custom) actionLink(ns(sprintf("reset_%s_%d", phase, b$a)), "標準に戻す", class = "rp-board-reset")
   )
 }

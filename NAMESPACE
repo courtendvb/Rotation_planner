@@ -1,2 +1,4 @@
 exportPattern("^[a-z][a-z0-9_]*$")
 import(shiny)
+importFrom(stats, setNames, complete.cases)
+importFrom(utils, head, modifyList)

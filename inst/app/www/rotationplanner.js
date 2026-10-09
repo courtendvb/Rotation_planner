@@ -1,4 +1,4 @@
-// コート図のドラッグ操作と、試合中モードのキーボードショートカット
+// コート図のドラッグ操作
 (function () {
   'use strict';
 
@@ -75,20 +75,4 @@
     }, { priority: 'event' });
   });
 
-  // ---- キーボード(試合中モード) ---------------------------------------------
-  // A = 自チーム得点, L = 相手得点, Z = 取り消し
-  const KEYS = { a: 'us', l: 'them', z: 'undo' };
-
-  document.addEventListener('keydown', function (evt) {
-    if (evt.ctrlKey || evt.metaKey || evt.altKey || evt.repeat) return;
-    const tag = (evt.target.tagName || '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || tag === 'select' || evt.target.isContentEditable) return;
-    const action = KEYS[evt.key.toLowerCase()];
-    if (!action || !window.Shiny) return;
-    // 表示中の試合画面だけに送る
-    const target = Array.from(document.querySelectorAll('.rp-live-keys')).find((el) => el.offsetParent !== null);
-    if (!target) return;
-    evt.preventDefault();
-    Shiny.setInputValue(target.dataset.input, action, { priority: 'event' });
-  });
 })();

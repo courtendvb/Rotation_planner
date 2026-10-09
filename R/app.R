@@ -16,26 +16,22 @@ app_ui <- function() {
     tabPanel("チーム", fluidRow(column(6, mod_roster_ui("us")), column(6, mod_roster_ui("them")))),
     tabPanel("ローテーション", mod_rotation_ui("rotation")),
     tabPanel("マッチアップ", mod_matchup_ui("matchup")),
-    tabPanel("試合", mod_live_ui("live")),
     tabPanel("データ", mod_data_ui("data"))
   )
 }
 
 app_server <- function(input, output, session) {
-  teams <- stored_reactive_val("teams", sample_teams())
+  defaults <- sample_teams()
+  teams <- stored_reactive_val("teams", defaults)
+  # 以前の版で保存したチーム(能力値の列など)を今の形にそろえる
+  isolate(teams(list(us = normalize_team(teams()$us, defaults$us), them = normalize_team(teams()$them, defaults$them))))
   placements <- stored_reactive_val("placements", list())
 
   mod_roster_server("us", teams, "us")
   mod_roster_server("them", teams, "them")
-  # 実績(データタブで選んだもの)。試合タブの記録を使う場合があるので、参照は実行時に解決する
-  data <- NULL
-  actual <- reactive(data$actual())
-  prior_n <- reactive(data$prior_n())
-
-  mod_rotation_server("rotation", teams, placements, actual, prior_n)
-  logs <- mod_live_server("live", teams, placements, actual, prior_n)
-  mod_matchup_server("matchup", teams, placements, actual, prior_n)
-  data <- mod_data_server("data", teams, logs)
+  data <- mod_data_server("data", teams, placements)
+  mod_rotation_server("rotation", teams, placements, data$stats, data$has_data, data$prior_n)
+  mod_matchup_server("matchup", teams, placements, data$stats, data$has_data, data$prior_n)
 }
 
 #' アプリを起動する。

@@ -45,15 +45,7 @@ body { font-size: 15px; }
 .rp-matrix th, .rp-matrix td { padding: 6px 10px; text-align: center; border: 1px solid #ddd; }
 .rp-matrix td.best { outline: 3px solid #222; outline-offset: -3px; font-weight: bold; }
 
-/* 試合中モード */
-.rp-score { display: flex; gap: 24px; align-items: center; justify-content: center; font-size: 56px; font-weight: bold; }
-.rp-score .team { font-size: 16px; font-weight: normal; color: #555; text-align: center; }
-.rp-score .serving::after { content: " ●"; color: #e0a000; }
-.rp-live-buttons { display: flex; gap: 12px; margin: 12px 0; }
-.rp-live-buttons .btn { flex: 1; font-size: 20px; padding: 18px 0; }
-.rp-live-buttons .btn-us { background: var(--rp-OH); color: #fff; }
-.rp-live-buttons .btn-them { background: var(--rp-OP); color: #fff; }
-.rp-kbd { display: inline-block; border: 1px solid #aaa; border-radius: 3px; padding: 0 5px; font-size: 12px; margin-left: 6px; }
+/* 一覧の補助 */
 .rp-facts dt { color: #666; font-weight: normal; }
 .rp-facts dd { margin-bottom: 8px; font-weight: bold; }
 
@@ -101,3 +93,6 @@ body { font-size: 15px; }
 .rp-stats-table td, .rp-stats-table th { white-space: nowrap; }
 .rp-stats-table .rp-total td { font-weight: bold; border-top: 2px solid #ccc; }
 .rp-board-actual { color: #444; }
+.rp-record td { min-width: 52px; font-size: 13px; }
+.rp-record .rp-empty { color: #bbb; }
+.rp-record .rp-total-cell { font-weight: bold; background: #f6f6f6; }

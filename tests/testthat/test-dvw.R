@@ -73,35 +73,29 @@ test_that("Shift_JIS のファイルも読める", {
   expect_equal(d$teams[["home"]], "山田クラブ")
 })
 
-test_that("ラリーとセッター位置別のサイドアウト・ブレイク", {
+test_that("ラリーを組み立て、対面別の実績にする", {
   d <- read_dvw(make_dvw(tempfile(fileext = ".dvw")))
   expect_equal(nrow(d$rallies), 3)
   expect_equal(d$rallies$winner, c("home", "visiting", "home"))
-  h <- dvw_setter_stats(d, "home")
-  expect_equal(h$serve[h$setter_pos == 3], 2)
-  expect_equal(h$break_point[h$setter_pos == 3], 1)
-  expect_equal(h$receive[h$setter_pos == 3], 1)
-  expect_equal(h$side_out[h$setter_pos == 3], 1)
-  v <- dvw_setter_stats(d, "visiting")
-  expect_equal(v$side_out[v$setter_pos == 3], 1)
-  expect_equal(v$serve[v$setter_pos == 2], 1)
+  home <- dvw_team(d, "home", team_id = "us")
+  away <- dvw_team(d, "visiting", team_id = "them")
+  ms <- matchup_stats(d$rallies, "home", home, away)
+  expect_equal(sum(ms$n), 3)
+  # ホームのサーブ2本(ホーム S3・ビジター S3):1本ブレイク
+  cell <- ms[ms$server == "us" & ms$us == setter_pos_to_rot(home, 3) & ms$them == setter_pos_to_rot(away, 3), ]
+  expect_equal(c(cell$n, cell$won), c(2, 1))
+  # ビジターのサーブ1本(ビジター S2):ホームがサイドアウト
+  cell <- ms[ms$server == "them" & ms$them == setter_pos_to_rot(away, 2), ]
+  expect_equal(c(sum(cell$n), sum(cell$won)), c(1, 1))
+  # 自チームをビジターにすると、取った数が入れ替わる
+  ms2 <- matchup_stats(d$rallies, "visiting", away, home)
+  expect_equal(sum(ms2$won), 1)
 })
 
-test_that("セッター位置別の実績をアプリのローテーションに対応させる", {
+test_that("セッター位置とアプリのローテーションの対応(S1 = セッターが P1)", {
   d <- read_dvw(make_dvw(tempfile(fileext = ".dvw")))
   home <- dvw_team(d, "home")   # 並びの P3 がセッター → ローテ0 = S3
-  st <- setter_stats_to_rotation(dvw_setter_stats(d, "home"), home)
   expect_equal(rotation_label(home, 0), "S3")
-  expect_equal(st$serve[st$rot == 0], 2)
-  expect_equal(sum(st$serve) + sum(st$receive), 3)
-})
-
-test_that("既存の能力値は背番号で引き継ぐ", {
-  d <- read_dvw(make_dvw(tempfile(fileext = ".dvw")))
-  old <- sample_teams()$us
-  old$players$number[old$players$role == "S"] <- 4L
-  old$players$attack[old$players$role == "S"] <- 9
-  home <- dvw_team(d, "home", existing = old)
-  expect_equal(home$players$attack[home$players$number == 4], 9)
-  expect_equal(home$players$attack[home$players$number == 15], 5)
+  expect_equal(setter_pos_to_rot(home, 3), 0)
+  for (k in 0:5) expect_equal(rotation_label(home, setter_pos_to_rot(home, setter_position(home, k))), rotation_label(home, k))
 })

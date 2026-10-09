@@ -2,8 +2,8 @@
 #
 # チームは list で表す:
 #   id, name   : 文字列
-#   players    : data.frame(id, number, name, role, attack, block, serve, receive)
-#                role は "S" "OH" "MB" "OP" "L"、能力値は 1〜10
+#   players    : data.frame(id, number, name, role)
+#                role は "S" "OH" "MB" "OP" "L"
 #   lineup     : 長さ6の選手 id。1番目 = P1, 2番目 = P2, ... 6番目 = P6
 #   libero     : リベロの id(いなければ NA)
 #

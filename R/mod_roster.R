@@ -1,7 +1,6 @@
 # チーム(選手と並び)の編集 -----------------------------------------------------
 
-ROSTER_COLUMNS <- c(id = "id", number = "#", name = "名前", role = "役割",
-                    attack = "攻撃", block = "ブロック", serve = "サーブ", receive = "レセプション")
+ROSTER_COLUMNS <- c(id = "id", number = "#", name = "名前", role = "役割")
 
 mod_roster_ui <- function(id) {
   ns <- NS(id)
@@ -14,7 +13,7 @@ mod_roster_ui <- function(id) {
       actionButton(ns("add"), "+ 選手を追加"),
       actionButton(ns("remove"), "選択した選手を削除")
     ),
-    p(class = "rp-hint", "セルをダブルクリックで編集。役割は S / OH / MB / OP / L、能力値は 1〜10。"),
+    p(class = "rp-hint", "セルをダブルクリックで編集。役割は S / OH / MB / OP / L。"),
     h4("スタートの並び"),
     uiOutput(ns("lineup")),
     uiOutput(ns("errors"))
@@ -79,10 +78,6 @@ mod_roster_server <- function(id, teams, key) {
       } else if (col == "number") {
         value <- suppressWarnings(as.integer(value))
         if (is.na(value)) return(DT::replaceData(proxy, shown, resetPaging = FALSE, rownames = FALSE))
-      } else if (col %in% c("attack", "block", "serve", "receive")) {
-        value <- suppressWarnings(as.numeric(value))
-        if (is.na(value)) return(DT::replaceData(proxy, shown, resetPaging = FALSE, rownames = FALSE))
-        value <- min(10, max(1, value))
       }
       pl[i, col] <- value
       set_team(modifyList(team(), list(players = pl)))
@@ -92,7 +87,7 @@ mod_roster_server <- function(id, teams, key) {
       t <- team()
       number <- max(c(0L, t$players$number)) + 1L
       new <- data.frame(id = paste0(t$id, "-", as.integer(Sys.time()), "-", number), number = number,
-                        name = "", role = "OH", attack = 5, block = 5, serve = 5, receive = 5)
+                        name = "", role = "OH")
       t$players <- rbind(t$players, new)
       set_team(t)
     })

@@ -111,7 +111,7 @@ dvw_rallies <- function(plays) {
   if (length(rows) == 0) empty else do.call(rbind, rows)
 }
 
-#' .dvw を読み込む。戻り値 list(teams, players, plays, rallies, file, mtime)
+#' .dvw を読み込む。戻り値 list(teams, players, plays, rallies, file, mtime, size)
 read_dvw <- function(path) {
   lines <- read_dvw_lines(path)
   teams <- split_fields(dvw_section(lines, "TEAMS"), 2)
@@ -124,7 +124,8 @@ read_dvw <- function(path) {
     plays = plays,
     rallies = dvw_rallies(plays),
     file = path,
-    mtime = file.mtime(path)
+    mtime = file.mtime(path),
+    size = file.size(path)
   )
 }
 
@@ -181,23 +182,15 @@ infer_dvw_roles <- function(players, plays, side) {
 }
 
 #' .dvw の一方のチームをアプリのチームにする。
-#' 既存のチームに同じ背番号の選手がいれば、その能力値を引き継ぐ。
 #' スタートの並びは、指定したセットの最初の記録の P1〜P6
-dvw_team <- function(dvw, side, existing = NULL, team_id = if (side == "home") "us" else "them", set = 1) {
+dvw_team <- function(dvw, side, team_id = if (side == "home") "us" else "them", set = 1) {
   pl <- dvw$players[[side]]
   role <- infer_dvw_roles(pl, dvw$plays, side)
-  old <- existing$players
-  rating <- function(n, key) {
-    v <- if (!is.null(old)) old[[key]][match(n, old$number)] else NA
-    ifelse(is.na(v), 5, v)
-  }
   players <- data.frame(
     id = paste0(team_id, "-", pl$number),
     number = pl$number,
     name = trimws(paste(pl$last, pl$first)),
-    role = role,
-    attack = rating(pl$number, "attack"), block = rating(pl$number, "block"),
-    serve = rating(pl$number, "serve"), receive = rating(pl$number, "receive")
+    role = role
   )
 
   lineup <- rep("", 6)
@@ -216,30 +209,6 @@ dvw_team <- function(dvw, side, existing = NULL, team_id = if (side == "home") "
   liberos <- players$id[players$role == "L" & !players$id %in% lineup]
   list(id = team_id, name = dvw$teams[[side]], players = players, lineup = lineup,
        libero = if (length(liberos)) liberos[1] else NA_character_)
-}
-
-#' .dvw の実績(セッター位置別のサイドアウト・ブレイク)
-dvw_setter_stats <- function(dvw, side) {
-  r <- dvw$rallies
-  sp <- r[[paste0(side, "_setter")]]
-  other <- setdiff(DVW_SIDES, side)
-  data.frame(
-    setter_pos = 1:6,
-    receive = vapply(1:6, function(s) sum(sp == s & r$server == other, na.rm = TRUE), numeric(1)),
-    side_out = vapply(1:6, function(s) sum(sp == s & r$server == other & r$winner == side, na.rm = TRUE), numeric(1)),
-    serve = vapply(1:6, function(s) sum(sp == s & r$server == side, na.rm = TRUE), numeric(1)),
-    break_point = vapply(1:6, function(s) sum(sp == s & r$server == side & r$winner == side, na.rm = TRUE), numeric(1))
-  )
-}
-
-#' セッター位置別の実績を、アプリのチームのローテーション(0〜5)別にする。
-#' S1 = セッターが P1 のローテーション、のように対応させる
-setter_stats_to_rotation <- function(stats, team) {
-  p0 <- setter_position(team, 0)
-  if (is.na(p0)) p0 <- 1
-  k <- (p0 - stats$setter_pos) %% 6
-  out <- stats[order(k), c("receive", "side_out", "serve", "break_point")]
-  cbind(rot = 0:5, out, row.names = NULL)
 }
 
 #' 5-1 の並びの決まり(セッターの対角 = OP、MB の対角 = MB、残りの対角 = OH)で、
