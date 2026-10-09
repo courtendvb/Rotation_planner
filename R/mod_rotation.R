@@ -56,7 +56,7 @@ mod_rotation_server <- function(id, teams, placements) {
     })
     prob <- reactive(rally_prob_array(us(), them()))
 
-    # 12 の対面と、それぞれの立ち位置・反則・ラリー取得率
+    # 12 の対面と、それぞれの立ち位置・ラリー取得率
     boards <- reactive({
       st <- setup()
       pr <- pairings_for_set(st$us_start, st$them_start, st$first)
