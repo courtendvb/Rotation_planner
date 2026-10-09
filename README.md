@@ -1,0 +1,92 @@
+# Rotation Planner
+
+バレーボール(一般の6人制)のローテーションのマッチアップを確認・研究し、試合中に最適なスタートローテーションを探すための、ローカルで動く R + Shiny アプリです。
+
+## 起動方法
+
+必要なパッケージ:`shiny`、`DT`(テストには `testthat`)
+
+```r
+install.packages(c("shiny", "DT"))
+```
+
+**インストールせずに起動する**(このフォルダを作業ディレクトリにして実行)
+
+```r
+source("run.R")
+```
+
+**パッケージとしてインストールして起動する**
+
+```r
+# install.packages("remotes")
+remotes::install_local("path/to/Rotation_planner")
+shiny::runApp(rotationplanner::run_app())
+```
+
+データ(チーム、立ち位置、試合の記録)は自動で RDS ファイルに保存されます。保存先は `tools::R_user_dir("rotationplanner", "data")` です。変える場合は `run_app(data_dir = "~/rotation-data")` のように指定します。
+
+## 画面
+
+| タブ | できること |
+|---|---|
+| チーム | 自チームと相手チームの選手(役割・能力値)、スタートの並び、リベロを登録 |
+| ローテーション | 6つのローテーション(S1〜S6)の配置を表示。選手をドラッグしてサーブレシーブ隊形を編集し、ポジショナルフォルトをその場で判定 |
+| マッチアップ | 自チームと相手のスタートの組み合わせ(6×6)ごとのセット取得確率、おすすめのスタート、各組み合わせで起きる12通りの対面の詳細 |
+| 試合 | 「自チーム得点」「相手得点」「取り消し」の3操作だけで記録(キーボードでは **A / L / Z**)。現在の対面、次の対面、ローテーション別のサイドアウト率とブレイク率を表示 |
+
+## 考え方
+
+- サイドアウトのたびに、サーブ権を得たチームだけが1つ回ります。そのため両チームの回転数の差は常に 0 か 1 です。
+- したがって **1セットの間に起きる対面は、両チームのスタートローテーションと最初のサーブ権だけで決まります**(12通り。選手交代では変わりません)。
+- マッチアップを最適化するとは、相手のスタートを予想し、自チームのスタートを選ぶことです。
+
+### ラリー取得率のモデル
+
+1. **能力値モデル**(`evaluate_pairing`)
+   - 前衛の対面:スイッチ後の配置(OH=レフト、MB=センター、S/OP=ライト)で、攻撃とブロックの差を比較します。自チームのレフトの攻撃は、相手のライトのブロックとぶつかります。
+   - サーブとレセプション:サーバーのサーブ力と、相手のレセプション陣(OH とリベロ)の平均を比較します。
+   - 上の評価点を、基準サイドアウト率(既定60%)からロジスティック関数でずらして確率にします。
+2. **実績の反映**(`blend_with_stats`):試合タブで記録したローテーション別のサイドアウト率とブレイク率で置き換えます(5本以上あるローテーションのみ)。
+
+### セット取得確率
+
+`(自チームのローテ, 相手のローテ, サーブ権)` の72状態のマルコフ連鎖として、後ろ向きに厳密に計算します(`set_win_all_states`)。デュースは連立方程式で解きます。
+
+## 構成
+
+```
+R/
+  rotation.R    ローテーション、リベロの入れ替わり、スイッチ後の配置
+  overlap.R     ポジショナルフォルト判定
+  matchup.R     対面の計算と能力値による評価
+  simulate.R    セット取得確率(マルコフ連鎖)、スタートの順位づけ
+  match.R       試合の記録(ラリーの勝者の列)、Undo、ローテーション別の集計
+  court.R       コート図(SVG)
+  mod_*.R       Shiny モジュール(roster / rotation / matchup / live)
+  app.R         アプリ本体と run_app()
+  storage.R     RDS への自動保存
+inst/app/www/   ドラッグ操作とキーボード入力の JavaScript、CSS
+tests/testthat/ テスト
+```
+
+中心のロジック(`rotation.R`〜`match.R`)は Shiny に依存しない純粋な関数です。画面は Shiny モジュールに分けてあるので、既存のアプリに組み込めます。
+
+```r
+# 既存のアプリに試合タブだけを組み込む例
+# UI 側(コート図と操作用の CSS / JavaScript も読み込む)
+addResourcePath("rp", rotationplanner::app_www_dir())
+tags$head(tags$link(rel = "stylesheet", href = "rp/rotationplanner.css"),
+          tags$script(src = "rp/rotationplanner.js"))
+rotationplanner::mod_live_ui("live")
+
+# server 側
+teams <- reactiveVal(rotationplanner::sample_teams())
+logs  <- rotationplanner::mod_live_server("live", teams)
+```
+
+## テスト
+
+```r
+testthat::test_local(".")
+```

@@ -1,0 +1,55 @@
+:root {
+  --rp-floor: #f3d9b1;
+  --rp-line: #ffffff;
+  --rp-net: #333333;
+  --rp-S: #e0b000;
+  --rp-OH: #2f6fd6;
+  --rp-MB: #2a9d5c;
+  --rp-OP: #d2453b;
+  --rp-L: #8a4fc4;
+  --rp-none: #888888;
+  --rp-good: #2a9d5c;
+  --rp-bad: #d2453b;
+}
+
+body { font-size: 15px; }
+.rp-panel { padding: 12px 0; }
+.rp-hint { color: #777; font-size: 13px; }
+.rp-ok { color: var(--rp-good); font-weight: bold; }
+.rp-errors { color: var(--rp-bad); padding-left: 18px; }
+
+/* コート */
+.rp-court { width: 100%; height: auto; display: block; user-select: none; touch-action: none; }
+.rp-court .court-floor { fill: var(--rp-floor); stroke: var(--rp-line); stroke-width: 0.08; }
+.rp-court .court-line { stroke: var(--rp-line); stroke-width: 0.06; }
+.rp-court .court-net { stroke: var(--rp-net); stroke-width: 0.12; }
+.rp-court .marker circle { stroke: #fff; stroke-width: 0.08; }
+.rp-court .marker text { text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.rp-court .marker-label { fill: #fff; font-size: 0.62px; font-weight: bold; }
+.rp-court .marker-sub { fill: #333; font-size: 0.36px; }
+.rp-court .marker.draggable { cursor: grab; }
+.rp-court .marker.dragging { cursor: grabbing; opacity: 0.8; }
+.rp-court .marker.warn circle { stroke: var(--rp-bad); stroke-width: 0.16; }
+.rp-court .role-S circle { fill: var(--rp-S); }
+.rp-court .role-OH circle { fill: var(--rp-OH); }
+.rp-court .role-MB circle { fill: var(--rp-MB); }
+.rp-court .role-OP circle { fill: var(--rp-OP); }
+.rp-court .role-L circle { fill: var(--rp-L); }
+.rp-court .role-none circle { fill: var(--rp-none); }
+
+/* マッチアップ行列 */
+.rp-matrix { border-collapse: collapse; margin: 8px 0; }
+.rp-matrix th, .rp-matrix td { padding: 6px 10px; text-align: center; border: 1px solid #ddd; }
+.rp-matrix td.best { outline: 3px solid #222; outline-offset: -3px; font-weight: bold; }
+
+/* 試合中モード */
+.rp-score { display: flex; gap: 24px; align-items: center; justify-content: center; font-size: 56px; font-weight: bold; }
+.rp-score .team { font-size: 16px; font-weight: normal; color: #555; text-align: center; }
+.rp-score .serving::after { content: " ●"; color: var(--rp-S); }
+.rp-live-buttons { display: flex; gap: 12px; margin: 12px 0; }
+.rp-live-buttons .btn { flex: 1; font-size: 20px; padding: 18px 0; }
+.rp-live-buttons .btn-us { background: var(--rp-OH); color: #fff; }
+.rp-live-buttons .btn-them { background: var(--rp-OP); color: #fff; }
+.rp-kbd { display: inline-block; border: 1px solid #aaa; border-radius: 3px; padding: 0 5px; font-size: 12px; margin-left: 6px; }
+.rp-facts dt { color: #666; font-weight: normal; }
+.rp-facts dd { margin-bottom: 8px; font-weight: bold; }

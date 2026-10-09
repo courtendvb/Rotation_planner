@@ -1,0 +1,13 @@
+Package: rotationplanner
+Title: Volleyball Rotation Matchup Planner
+Version: 0.1.0
+Description: Local Shiny application for checking, studying and optimising
+    volleyball rotation matchups (6-player indoor rules): rotation viewer with
+    overlap (positional fault) checking, set matchup analysis with a Markov
+    set-win model, and live match tracking.
+License: Private (not yet licensed)
+Encoding: UTF-8
+Depends: R (>= 4.1)
+Imports: shiny (>= 1.7), DT
+Suggests: testthat (>= 3.0.0)
+Config/testthat/edition: 3
