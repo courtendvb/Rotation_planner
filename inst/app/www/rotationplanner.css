@@ -53,3 +53,14 @@ body { font-size: 15px; }
 .rp-kbd { display: inline-block; border: 1px solid #aaa; border-radius: 3px; padding: 0 5px; font-size: 12px; margin-left: 6px; }
 .rp-facts dt { color: #666; font-weight: normal; }
 .rp-facts dd { margin-bottom: 8px; font-weight: bold; }
+
+/* ローテーション一覧(6コート) */
+.rp-rot-card { border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; margin-bottom: 16px; background: #fff; }
+.rp-rot-card.bad { border-color: var(--rp-bad); box-shadow: 0 0 0 1px var(--rp-bad); }
+.rp-rot-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.rp-rot-label { font-size: 22px; font-weight: bold; }
+.rp-rot-meta { color: #555; font-size: 13px; }
+.rp-rot-custom { margin-left: auto; font-size: 12px; color: #8a6d00; background: #fff4cc; border-radius: 3px; padding: 0 6px; }
+.rp-rot-card .rp-court { margin: 0 auto; }
+.rp-rot-foot { min-height: 52px; }
+.rp-rot-foot .rp-errors { margin: 0; }

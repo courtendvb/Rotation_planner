@@ -8,9 +8,9 @@ mod_live_ui <- function(id) {
   uiOutput(ns("body"))
 }
 
-#' teams: list(us, them) の reactiveVal。
+#' teams: list(us, them) の reactiveVal。placements: 保存した立ち位置の reactive
 #' 戻り値: これまでの全ラリー(終了したセット + 進行中のセット)の data.frame を返す reactive
-mod_live_server <- function(id, teams) {
+mod_live_server <- function(id, teams, placements = reactive(list())) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -154,8 +154,8 @@ mod_live_server <- function(id, teams) {
 
     output$court <- renderUI({
       s <- state()
-      court_svg(team_markers(us(), s$us_rot, s$server == "us"),
-                opponent = team_markers(them(), s$them_rot, s$server == "them"), max_width = 360)
+      court_svg(match_markers(us(), s$us_rot, s$server == "us", placements()),
+                opponent = match_markers(them(), s$them_rot, s$server == "them", placements()), max_width = 360)
     })
 
     all_logs <- reactive({

@@ -42,7 +42,7 @@ mod_matchup_ui <- function(id) {
 }
 
 #' teams: list(us, them) の reactiveVal。logs: 試合の記録(ラリーの data.frame)を返す reactive
-mod_matchup_server <- function(id, teams, logs) {
+mod_matchup_server <- function(id, teams, logs, placements = reactive(list())) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -146,8 +146,8 @@ mod_matchup_server <- function(id, teams, logs) {
 
     output$court <- renderUI({
       s <- selected()
-      court_svg(team_markers(us(), s$us, s$server == "us"),
-                opponent = team_markers(them(), s$them, s$server == "them"), max_width = 300)
+      court_svg(match_markers(us(), s$us, s$server == "us", placements()),
+                opponent = match_markers(them(), s$them, s$server == "them", placements()), max_width = 300)
     })
 
     output$duels <- renderUI({

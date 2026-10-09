@@ -27,8 +27,8 @@ app_server <- function(input, output, session) {
   mod_roster_server("us", teams, "us")
   mod_roster_server("them", teams, "them")
   mod_rotation_server("rotation", teams, placements)
-  logs <- mod_live_server("live", teams)
-  mod_matchup_server("matchup", teams, logs)
+  logs <- mod_live_server("live", teams, placements)
+  mod_matchup_server("matchup", teams, logs, placements)
 }
 
 #' アプリを起動する。

@@ -17,6 +17,11 @@ team_markers <- function(team, k, serving, placement = default_placement(), warn
   )
 }
 
+#' 対面の表示用:レシーブ側はレセプションフォーメーション、サーブ側はサーブ時の配置
+match_markers <- function(team, k, serving, placements = list()) {
+  team_markers(team, k, serving, placement_for(team, k, serving, placements))
+}
+
 svg_escape <- function(x) {
   x <- gsub("&", "&amp;", x, fixed = TRUE)
   x <- gsub("<", "&lt;", x, fixed = TRUE)
@@ -37,11 +42,13 @@ marker_svg <- function(m, mine, offset, draggable) {
 #'   markers   : 自チームのマーカー
 #'   opponent  : 相手のマーカー(NULL なら自コートのみ)
 #'   drag_input: ドラッグ結果を受け取る Shiny の input id(NULL ならドラッグ不可)
-court_svg <- function(markers, opponent = NULL, drag_input = NULL, max_width = 440) {
+#'   court_key : 複数のコートを並べるときの識別子(ドラッグ結果の court に入る)
+court_svg <- function(markers, opponent = NULL, drag_input = NULL, max_width = 440, court_key = NULL) {
   full <- !is.null(opponent)
   offset <- if (full) 9 else 0
   height <- if (full) 18 else 9
   margin <- 1.2
+  bottom <- 1.9  # エンドラインの外に立つサーバーの表示ぶん
   lines <- if (full) {
     c('<line class="court-line" x1="0" x2="9" y1="6" y2="6"/>',
       '<line class="court-line" x1="0" x2="9" y1="12" y2="12"/>',
@@ -59,8 +66,9 @@ court_svg <- function(markers, opponent = NULL, drag_input = NULL, max_width = 4
   )
   HTML(sprintf(
     '<svg class="rp-court" viewBox="%.1f %.1f %.1f %.1f" style="max-width:%dpx" data-offset="%d"%s>%s</svg>',
-    -margin, -margin, 9 + 2 * margin, height + 2 * margin, max_width, offset,
-    if (draggable) sprintf(' data-input="%s"', drag_input) else "",
+    -margin, -margin, 9 + 2 * margin, height + margin + bottom, max_width, offset,
+    paste0(if (draggable) sprintf(' data-input="%s"', drag_input) else "",
+           if (!is.null(court_key)) sprintf(' data-court="%s"', court_key) else ""),
     paste(body, collapse = "")
   ))
 }

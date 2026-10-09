@@ -38,6 +38,7 @@
     d.g.classList.remove('dragging');
     if (!d.point || !window.Shiny) return;
     Shiny.setInputValue(d.svg.dataset.input, {
+      court: d.svg.dataset.court || null,
       pos: d.pos,
       x: Math.round(d.point.x * 10) / 10,
       y: Math.round(d.point.y * 10) / 10,

@@ -1,22 +1,19 @@
-# ローテーション・ビューア(立ち位置の編集とポジショナルフォルト判定) -----------
+# ローテーション・ビューア(6ローテーションを一覧で確認・編集) -------------------
 
 mod_rotation_ui <- function(id) {
   ns <- NS(id)
-  fluidRow(
-    column(
-      7,
-      div(
-        class = "rp-panel",
-        fluidRow(
-          column(6, radioButtons(ns("team"), NULL, c("自チーム" = "us", "相手チーム" = "them"), inline = TRUE)),
-          column(6, radioButtons(ns("serving"), NULL, c("レシーブ" = "receive", "サーブ" = "serve"), inline = TRUE))
-        ),
-        uiOutput(ns("rot_buttons")),
-        uiOutput(ns("court")),
-        p(class = "rp-hint", "選手をドラッグして立ち位置を編集できます(自動保存)。")
-      )
+  div(
+    class = "rp-panel",
+    fluidRow(
+      column(4, radioButtons(ns("team"), NULL, c("自チーム" = "us", "相手チーム" = "them"), inline = TRUE)),
+      column(4, radioButtons(ns("serving"), NULL,
+                             c("レシーブ(レセプション)" = "receive", "サーブ" = "serve"), inline = TRUE)),
+      column(4, uiOutput(ns("summary")))
     ),
-    column(5, div(class = "rp-panel", uiOutput(ns("side"))))
+    uiOutput(ns("grid")),
+    p(class = "rp-hint",
+      "初期表示は役割から自動で作った標準のフォーメーションです。",
+      "選手をドラッグすると立ち位置を変更でき、自動で保存されます。赤枠はポジショナルフォルトです。")
   )
 }
 
@@ -24,60 +21,90 @@ mod_rotation_ui <- function(id) {
 mod_rotation_server <- function(id, teams, placements) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    team <- reactive(teams()[[input$team]])
-    k <- reactiveVal(0)
+    team <- reactive(teams()[[input$team %||% "us"]])
     serving <- reactive(identical(input$serving, "serve"))
 
-    output$rot_buttons <- renderUI({
+    # ローテーションごとの立ち位置と反則
+    courts <- reactive({
       t <- team()
-      choices <- setNames(0:5, vapply(0:5, function(i) rotation_label(t, i), ""))
-      radioButtons(ns("rot"), "ローテーション", choices, selected = isolate(k()), inline = TRUE)
+      lapply(0:5, function(k) {
+        pl <- placement_for(t, k, serving(), placements())
+        list(k = k, placement = pl, violations = check_overlap(pl, serving()),
+             custom = !is.null(placements()[[placement_key(t, k, serving())]]))
+      })
     })
-    observeEvent(input$rot, k(as.integer(input$rot)))
-
-    key <- reactive(sprintf("%s:%d:%s", team()$id, k(), input$serving))
-    placement <- reactive(placements()[[key()]] %||% default_placement())
-    violations <- reactive(check_overlap(placement(), serving()))
 
     observeEvent(input$move, {
       m <- input$move
-      pl <- placement()
+      k <- as.integer(m$court)
+      t <- team()
+      pl <- placement_for(t, k, serving(), placements())
       pl[pl$pos == m$pos, c("x", "y")] <- c(m$x, m$y)
       all <- placements()
-      all[[key()]] <- pl
+      all[[placement_key(t, k, serving())]] <- pl
       placements(all)
     })
-    observeEvent(input$reset, {
+
+    lapply(0:5, function(k) {
+      observeEvent(input[[paste0("reset_", k)]], {
+        all <- placements()
+        all[[placement_key(team(), k, serving())]] <- NULL
+        placements(all)
+      })
+    })
+    observeEvent(input$reset_all, {
       all <- placements()
-      all[[key()]] <- NULL
+      for (k in 0:5) all[[placement_key(team(), k, serving())]] <- NULL
       placements(all)
     })
 
-    output$court <- renderUI({
-      v <- violations()
-      markers <- team_markers(team(), k(), serving(), placement(), warn = unique(c(v$a, v$b)))
-      court_svg(markers, drag_input = ns("move"), max_width = 480)
-    })
-
-    output$side <- renderUI({
-      t <- team()
-      fmt <- function(p) if (nrow(p) == 1) sprintf("#%d %s", p$number, p$role) else "—"
-      front <- front_row_after_switch(t, k())
-      v <- violations()
+    output$summary <- renderUI({
+      cs <- courts()
+      n_bad <- sum(vapply(cs, function(c) nrow(c$violations) > 0, logical(1)))
+      n_custom <- sum(vapply(cs, function(c) c$custom, logical(1)))
       tagList(
-        h3(rotation_label(t, k())),
-        tags$dl(
-          class = "rp-facts",
-          tags$dt("前衛アタッカー"), tags$dd(sprintf("%d 枚", front_attacker_count(t, k()))),
-          tags$dt("サーバー"), tags$dd(fmt(server_of(t, k()))),
-          tags$dt("スイッチ後(レフト / センター / ライト)"),
-          tags$dd(paste(fmt(front$left), fmt(front$middle), fmt(front$right), sep = " / "))
-        ),
-        h4("ポジショナルフォルト"),
-        if (nrow(v) == 0) p(class = "rp-ok", "反則なし")
-        else tags$ul(class = "rp-errors", lapply(v$message, tags$li)),
-        if (!is.null(placements()[[key()]])) actionButton(ns("reset"), "基本ポジションに戻す")
+        if (n_bad == 0) span(class = "rp-ok", "6ローテーションすべて反則なし")
+        else span(class = "rp-errors", sprintf("%d つのローテーションに反則があります", n_bad)),
+        if (n_custom > 0) actionLink(ns("reset_all"), "すべて標準のフォーメーションに戻す", style = "margin-left:12px")
       )
     })
+
+    output$grid <- renderUI({
+      t <- team()
+      cards <- lapply(courts(), function(c) rotation_card(ns, t, c, serving()))
+      tagList(fluidRow(cards[1:3]), fluidRow(cards[4:6]))
+    })
   })
+}
+
+rotation_card <- function(ns, team, court, serving) {
+  k <- court$k
+  v <- court$violations
+  front <- front_row_after_switch(team, k)
+  fmt <- function(p) if (nrow(p) == 1) sprintf("#%d", p$number) else "—"
+  srv <- server_of(team, k)
+  markers <- team_markers(team, k, serving, court$placement, warn = unique(c(v$a, v$b)))
+
+  column(
+    4,
+    div(
+      class = paste("rp-rot-card", if (nrow(v) > 0) "bad"),
+      div(
+        class = "rp-rot-head",
+        span(class = "rp-rot-label", rotation_label(team, k)),
+        span(class = "rp-rot-meta",
+             sprintf("前衛 %d 枚 / サーバー %s", front_attacker_count(team, k), fmt(srv))),
+        if (court$custom) span(class = "rp-rot-custom", "編集済み")
+      ),
+      court_svg(markers, drag_input = ns("move"), court_key = k, max_width = 340),
+      div(
+        class = "rp-rot-foot",
+        if (nrow(v) == 0) span(class = "rp-ok", "反則なし")
+        else tags$ul(class = "rp-errors", lapply(v$message, tags$li)),
+        div(class = "rp-hint",
+            sprintf("スイッチ後 L / C / R:%s / %s / %s", fmt(front$left), fmt(front$middle), fmt(front$right))),
+        if (court$custom) actionLink(ns(paste0("reset_", k)), "標準に戻す")
+      )
+    )
+  )
 }
