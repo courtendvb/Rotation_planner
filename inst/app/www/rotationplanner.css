@@ -22,7 +22,11 @@ body { font-size: 15px; }
 .rp-court { width: 100%; height: auto; display: block; user-select: none; touch-action: none; }
 .rp-court .court-floor { fill: var(--rp-floor); stroke: var(--rp-line); stroke-width: 0.08; }
 .rp-court .court-line { stroke: var(--rp-line); stroke-width: 0.06; }
-.rp-court .court-net { stroke: var(--rp-net); stroke-width: 0.12; }
+.rp-court .court-net { stroke: var(--rp-net); stroke-width: 0.1; }
+.rp-court .court-net-mesh { fill: #222; fill-opacity: 0.08; stroke: none; pointer-events: none; }
+.rp-court .court-net-band { stroke: #fff; stroke-width: 0.14; pointer-events: none; }
+.rp-court .court-net-post { stroke: #666; stroke-width: 0.12; }
+.rp-court .court-shade { pointer-events: none; }
 .rp-court .marker circle { stroke: #fff; stroke-width: 0.08; }
 .rp-court .marker text { text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .rp-court .marker-label { fill: #fff; font-size: 0.62px; font-weight: bold; }

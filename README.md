@@ -62,6 +62,10 @@ shiny::runApp(rotationplanner::run_app())
 
 `attack_positions()` がレシーブ後の移動先を役割から決めます。セッターはセットアップ位置、前衛は OH がレフト・MB がセンター・OP がライトの助走位置、後衛の OH はパイプ、後衛の OP はバックライトへ向かいます。リベロと後衛の MB は動きません。
 
+### コート図
+
+自チームのエンドラインの後ろ上方から見た遠近法(奥ほど狭い台形)で描きます。奥の幅は `PERSPECTIVE_RATIO`、奥行きの縮みは `PERSPECTIVE_DEPTH`(`R/court.R`)で調整できます。マーカーの大きさは遠近で変えません。
+
 ### マーカーの色
 
 セッター=黒、アウトサイド=青、ミドル=緑、オポジット=赤、リベロ=紫。
@@ -82,7 +86,7 @@ R/
   matchup.R     対面の計算と能力値による評価
   simulate.R    セット取得確率(マルコフ連鎖)、スタートの順位づけ
   match.R       試合の記録(ラリーの勝者の列)、Undo、ローテーション別の集計
-  court.R       コート図(SVG)
+  court.R       コート図(SVG、遠近法の台形)
   mod_*.R       Shiny モジュール(roster / rotation / matchup / live)
   app.R         アプリ本体と run_app()
   storage.R     RDS への自動保存
