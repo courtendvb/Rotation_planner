@@ -109,23 +109,33 @@ inst/app/www/   ドラッグ操作の JavaScript、CSS
 tests/testthat/ テスト
 ```
 
-中心のロジック(`rotation.R`〜`stats.R`、`dvw.R`)は Shiny に依存しない純粋な関数です。画面は Shiny モジュールに分けてあるので、既存のアプリに組み込めます。
+中心のロジック(`rotation.R`〜`stats.R`、`dvw.R`)は Shiny に依存しない純粋な関数です。
+
+## 試合中のアプリへの組み込み
+
+既存の試合中アプリ(`page_navbar` のアプリ)に、タブとして足せます(`R/mod_in_match.R`)。
+
+1. このパッケージをインストールする(このフォルダで `remotes::install_local(".")`)
+2. UI の `page_navbar(...)` にタブを足す
 
 ```r
-# 既存のアプリにローテーションの12面ボードを組み込む例
-# UI 側(コート図と操作用の CSS / JavaScript も読み込む)
-addResourcePath("rp", rotationplanner::app_www_dir())
-tags$head(tags$link(rel = "stylesheet", href = "rp/rotationplanner.css"),
-          tags$script(src = "rp/rotationplanner.js"))
-rotationplanner::mod_rotation_ui("rotation")
-
-# server 側:チームと対面別の実績を渡す
-d <- rotationplanner::read_dvw("match.dvw")
-teams <- reactiveVal(list(us = rotationplanner::dvw_team(d, "home", "us"),
-                          them = rotationplanner::dvw_team(d, "visiting", "them")))
-stats <- reactive(rotationplanner::matchup_stats(d$rallies, "home", teams()$us, teams()$them))
-rotationplanner::mod_rotation_server("rotation", teams, reactiveVal(list()), stats, reactive(TRUE))
+  nav_menu(
+    title = "Rotation",
+    tabPanel(title = "Board", rotationplanner::in_match_board_ui("rotation")),
+    tabPanel(title = "Matchup", rotationplanner::in_match_matchup_ui("rotation"))
+  )
 ```
+
+3. `server` の中に1行足す(`fname` は既存アプリで読んでいる .dvw のパス)
+
+```r
+  rotationplanner::in_match_server("rotation", dvw_path = fname)
+```
+
+- .dvw は3秒ごとに更新を確かめ、変わったときだけ読み直します(既存アプリの読み込みとは独立)
+- 「自チーム」(ホーム/ビジター)と「セット」を選ぶと、そのセットのスタートの並び・最初のサーブが自動で入り、12通りの対面を表示します。新しいセットが始まると自動で移ります
+- Matchup タブには、この試合の対面別の実績と、スタートの検討(セット取得確率)を表示します
+- ドラッグした立ち位置や S1 のパターンは見ている人(ブラウザ)ごとに持ち、ファイルには保存しません(ベンチの複数の PC で操作しても干渉しない)
 
 ## テスト
 

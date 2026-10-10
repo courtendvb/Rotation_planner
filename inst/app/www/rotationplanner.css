@@ -51,7 +51,7 @@ body { font-size: 15px; }
 
 /* ローテーション対面ボード(12コート) */
 .rp-board-controls { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.rp-inline-inputs { display: flex; gap: 16px; align-items: flex-end; }
+.rp-inline-inputs { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: flex-end; }
 .rp-inline-inputs .form-group { margin-bottom: 6px; }
 .rp-board-summary { display: flex; gap: 16px; align-items: baseline; margin-bottom: 8px; }
 .rp-board-summary strong { font-size: 20px; margin-left: 6px; }
@@ -91,3 +91,12 @@ body { font-size: 15px; }
 .rp-record td { min-width: 52px; font-size: 13px; }
 .rp-record .rp-empty { color: #bbb; }
 .rp-record .rp-total-cell { font-weight: bold; background: #f6f6f6; }
+
+/* 入力欄を詰める(既存アプリの bslib のテーマでも1〜2行に収まるように) */
+.rp-board-controls .form-group, .rp-board-controls .shiny-input-container { margin-bottom: 4px; }
+.rp-board-controls .control-label, .rp-board-controls label { margin-bottom: 1px; font-size: 13px; }
+.rp-board-controls .selectize-input { min-height: 0; padding: 4px 8px; font-size: 13px; }
+.rp-board-controls .shiny-options-group { font-size: 13px; }
+.rp-board-controls .rp-hint { margin-bottom: 8px; }
+/* 既存アプリに組み込んだとき(ナビゲーションや入力欄が大きいぶん、コートを少し小さく) */
+.rp-in-match .rp-board-card .rp-court { height: calc((100vh - 420px) / 2); }

@@ -7,13 +7,14 @@
 
 ROLE_LEGEND <- c(S = "セッター", OH = "アウトサイド", MB = "ミドル", OP = "オポジット", L = "リベロ")
 
-mod_rotation_ui <- function(id) {
+#' extra_controls: 入力欄の行の先頭に足す UI(試合中の組み込みで「自チーム」「セット」を並べる)
+mod_rotation_ui <- function(id, extra_controls = NULL) {
   ns <- NS(id)
   div(
     class = "rp-panel",
     div(
       class = "rp-board-controls",
-      uiOutput(ns("controls"), inline = TRUE),
+      div(class = "rp-inline-inputs", extra_controls, uiOutput(ns("controls"), inline = TRUE)),
       uiOutput(ns("summary"), inline = TRUE)
     ),
     uiOutput(ns("board")),
@@ -30,8 +31,9 @@ mod_rotation_ui <- function(id) {
 
 #' teams: list(us, them) の reactiveVal。placements: 立ち位置を保存する reactiveVal。
 #' stats / has_data / prior_n: 対面別の実績(データタブ)
+#' start: スタートを外から決める場合の reactive(list(us_start, them_start, first))。NULL なら画面で選ぶ
 mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_matchup_stats()),
-                                has_data = reactive(FALSE), prior_n = reactive(10)) {
+                                has_data = reactive(FALSE), prior_n = reactive(10), start = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -43,11 +45,14 @@ mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_ma
       div(
         class = "rp-inline-inputs",
         selectInput(ns("us_start"), "自チームのスタート", rot_choices(us()),
-                    selected = isolate(input$us_start) %||% 0, width = "150px"),
+                    selected = if (!is.null(start)) start()$us_start else isolate(input$us_start) %||% 0,
+                    width = "150px"),
         selectInput(ns("them_start"), "相手のスタート", rot_choices(them()),
-                    selected = isolate(input$them_start) %||% 0, width = "150px"),
+                    selected = if (!is.null(start)) start()$them_start else isolate(input$them_start) %||% 0,
+                    width = "150px"),
         radioButtons(ns("first_server"), "最初のサーブ", c("自チーム" = "us", "相手" = "them"),
-                     selected = isolate(input$first_server) %||% "us", inline = TRUE),
+                     selected = if (!is.null(start)) start()$first else isolate(input$first_server) %||% "us",
+                     inline = TRUE),
         selectInput(ns("variant_us"), "自チームの S1", RECEPTION_VARIANT_CHOICES[["1"]],
                     selected = reception_variant(us(), 1), width = "150px"),
         selectInput(ns("variant_them"), "相手の S1", RECEPTION_VARIANT_CHOICES[["1"]],

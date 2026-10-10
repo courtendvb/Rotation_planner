@@ -8,6 +8,6 @@ Description: Local Shiny application for checking, studying and optimising
 License: Private (not yet licensed)
 Encoding: UTF-8
 Depends: R (>= 4.1)
-Imports: shiny (>= 1.7), DT
+Imports: shiny (>= 1.7), DT, htmltools
 Suggests: testthat (>= 3.0.0)
 Config/testthat/edition: 3
