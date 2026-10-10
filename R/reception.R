@@ -74,6 +74,31 @@ reception_slots <- function(team, k) {
   if (anyNA(slots) || anyDuplicated(slots)) NULL else slots
 }
 
+# 型の別パターン(セッターの位置ごと)。チームの reception_variants で選ぶ。
+#   S1 の op_left:OP がレフトに残って攻撃し、前衛 OH がライトでレシーブしてライトから攻撃する。
+#                  後衛 OH は左でレシーブしてパイプ、リベロは中央
+RECEPTION_VARIANTS <- list(
+  `1` = list(
+    op_left = list(
+      label = "OPレフト",
+      pos = list(S = c(8.1, 8.3), OP = c(1.4, 2.0), MB = c(2.1, 3.3), OHF = c(7.0, 5.9), OHB = c(2.2, 6.3), L = c(4.6, 6.5)),
+      path = list(OP = list(x = c(0.7, 0.5), y = c(3.0, ATTACK_FRONT_Y)),
+                  MB = list(x = c(3.7, 4.1), y = c(3.4, ATTACK_FRONT_Y)),
+                  OHF = list(x = c(8.6, 8.6), y = c(3.6, ATTACK_FRONT_Y)),
+                  OHB = list(x = c(3.8, 4.5), y = c(5.0, ATTACK_BACK_Y)))
+    )
+  )
+)
+
+# 選べるパターン(画面の選択肢)。標準は RECEPTION_TEMPLATES の型
+RECEPTION_VARIANT_CHOICES <- list(`1` = c("OPライト(標準)" = "standard", "OPレフト" = "op_left"))
+
+#' チームがそのセッター位置で選んでいるパターン("standard" または別パターンの名前)
+reception_variant <- function(team, setter_pos) {
+  v <- team$reception_variants[[as.character(setter_pos)]]
+  if (is.null(v) || is.null(RECEPTION_VARIANTS[[as.character(setter_pos)]][[v]])) "standard" else v
+}
+
 # 型が前提とする並び(セッターから時計回りと逆に P1 → P2 → ... の順)
 STANDARD_5_1 <- c("S", "OH", "MB", "OP", "OH", "MB")
 
@@ -90,7 +115,10 @@ reception_template <- function(team, k) {
   sp <- setter_position(team, k)
   slots <- reception_slots(team, k)
   if (is.na(sp) || is.null(slots)) return(NULL)
-  list(slots = slots, template = RECEPTION_TEMPLATES[[as.character(sp)]])
+  variant <- reception_variant(team, sp)
+  template <- if (variant == "standard") RECEPTION_TEMPLATES[[as.character(sp)]]
+              else RECEPTION_VARIANTS[[as.character(sp)]][[variant]]
+  list(slots = slots, template = template, variant = variant)
 }
 
 #' 型からレセプションの立ち位置を作る

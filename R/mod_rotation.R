@@ -47,9 +47,23 @@ mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_ma
         selectInput(ns("them_start"), "相手のスタート", rot_choices(them()),
                     selected = isolate(input$them_start) %||% 0, width = "150px"),
         radioButtons(ns("first_server"), "最初のサーブ", c("自チーム" = "us", "相手" = "them"),
-                     selected = isolate(input$first_server) %||% "us", inline = TRUE)
+                     selected = isolate(input$first_server) %||% "us", inline = TRUE),
+        selectInput(ns("variant_us"), "自チームの S1", RECEPTION_VARIANT_CHOICES[["1"]],
+                    selected = reception_variant(us(), 1), width = "150px"),
+        selectInput(ns("variant_them"), "相手の S1", RECEPTION_VARIANT_CHOICES[["1"]],
+                    selected = reception_variant(them(), 1), width = "150px")
       )
     })
+
+    # S1 のレセプション・攻撃パターン(チームごとに保存)
+    set_variant <- function(key, value) {
+      all <- teams()
+      if (identical(reception_variant(all[[key]], 1), value)) return()
+      all[[key]]$reception_variants[["1"]] <- value
+      teams(all)
+    }
+    observeEvent(input$variant_us, set_variant("us", input$variant_us), ignoreInit = TRUE)
+    observeEvent(input$variant_them, set_variant("them", input$variant_them), ignoreInit = TRUE)
 
     setup <- reactive({
       req(input$us_start, input$them_start, input$first_server)

@@ -102,3 +102,31 @@ test_that("型が使えない並びでは、役割から決めた攻撃位置へ
   expect_true(all(vapply(ar, function(a) length(a$x) == 2, logical(1))))
   expect_false(any(vapply(ar, `[[`, "", "role") %in% c("S", "L")))
 })
+
+test_that("S1 の OPレフト:OP はレフトへ、前衛 OH はライトでレシーブしてライトへ", {
+  us <- teams$us
+  us$reception_variants <- list(`1` = "op_left")
+  rt <- reception_template(us, 0)   # k = 0 が S1
+  expect_equal(rt$variant, "op_left")
+  ar <- transition_arrows(us, 0, default_reception(us, 0))
+  op <- Filter(function(a) a$role == "OP", ar)[[1]]
+  expect_lt(tail(op$x, 1), 1)                       # レフト
+  oh_end <- vapply(Filter(function(a) a$role == "OH", ar), function(a) tail(a$x, 1), 0)
+  expect_true(any(oh_end > 8))                      # ライトから攻撃する OH がいる
+  expect_true(keeps_rotation_order(default_reception(us, 0), FALSE))
+  # 標準のときは OP がライトへ
+  op_std <- Filter(function(a) a$role == "OP", transition_arrows(teams$us, 0, default_reception(teams$us, 0)))[[1]]
+  expect_gt(tail(op_std$x, 1), 8)
+})
+
+test_that("パターンは S1 だけに効き、立ち位置の保存もパターンごとに分かれる", {
+  us <- teams$us
+  us$reception_variants <- list(`1` = "op_left")
+  for (k in 1:5) expect_identical(default_reception(us, k), default_reception(teams$us, k))
+  expect_false(identical(placement_key(us, 0, FALSE), placement_key(teams$us, 0, FALSE)))
+  expect_identical(placement_key(us, 1, FALSE), placement_key(teams$us, 1, FALSE))
+  expect_identical(placement_key(us, 0, TRUE), placement_key(teams$us, 0, TRUE))
+  # 知らないパターン名は標準扱い
+  us$reception_variants <- list(`1` = "unknown")
+  expect_equal(reception_variant(us, 1), "standard")
+})

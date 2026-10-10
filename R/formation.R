@@ -120,9 +120,15 @@ legalize_placement <- function(pl, gap = FORMATION_GAP) {
   pl
 }
 
-#' 立ち位置の保存キー
+#' 立ち位置の保存キー。レセプションで別パターンを選んでいるときは、パターンごとに分けて保存する
 placement_key <- function(team, k, serving) {
-  sprintf("%s:%d:%s", team$id, k %% 6, if (serving) "serve" else "receive")
+  key <- sprintf("%s:%d:%s", team$id, k %% 6, if (serving) "serve" else "receive")
+  if (!serving) {
+    sp <- setter_position(team, k)
+    v <- if (is.na(sp)) "standard" else reception_variant(team, sp)
+    if (v != "standard") key <- paste0(key, ":", v)
+  }
+  key
 }
 
 #' 保存した立ち位置があればそれを、なければ既定のフォーメーションを返す

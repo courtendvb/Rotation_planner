@@ -136,8 +136,13 @@ mod_data_server <- function(id, teams, placements) {
       ours <- input$our_side
       theirs <- setdiff(DVW_SIDES, ours)
       set <- as.integer(input$set %||% 1)
-      teams(list(us = dvw_team(d, ours, team_id = "us", set = set),
-                 them = dvw_team(d, theirs, team_id = "them", set = set)))
+      cur <- teams()
+      us <- dvw_team(d, ours, team_id = "us", set = set)
+      them <- dvw_team(d, theirs, team_id = "them", set = set)
+      # レセプションのパターンの選択は引き継ぐ
+      us$reception_variants <- cur$us$reception_variants
+      them$reception_variants <- cur$them$reception_variants
+      teams(list(us = us, them = them))
       # 前のチームで保存した立ち位置は、新しいメンバーには当てはまらないので消す
       placements(list())
       showNotification(sprintf("%s と %s のメンバーを読み込みました", d$teams[[ours]], d$teams[[theirs]]),
