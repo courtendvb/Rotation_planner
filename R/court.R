@@ -71,27 +71,35 @@ marker_svg <- function(m, mine, offset, pr, draggable, attrs = "", compact = FAL
   )
 }
 
-ARROW_ROLES <- c("S", "OH", "MB", "OP", "L", "none")
-
-# 矢じり(役割の色ごと)
+# 矢じり
 arrow_defs <- function() {
-  paste(sprintf(
-    '<marker id="rp-arrow-%s" class="arrowhead role-%s" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>',
-    ARROW_ROLES, ARROW_ROLES), collapse = "")
+  paste0('<marker id="rp-arrow" class="arrowhead" viewBox="0 0 10 10" refX="7" refY="5" ',
+         'markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>')
 }
 
-# 矢印(arrows はチームの自コート座標の data.frame(role, x1, y1, x2, y2))
+# 点の並びを通るなめらかな曲線(Catmull-Rom を3次ベジェにしたもの)の SVG パス
+smooth_path <- function(x, y) {
+  n <- length(x)
+  if (n == 2) return(sprintf("M%.2f,%.2f L%.2f,%.2f", x[1], y[1], x[2], y[2]))
+  px <- c(x[1], x, x[n]); py <- c(y[1], y, y[n])
+  seg <- vapply(seq_len(n - 1), function(i) {
+    j <- i + 1  # px/py での点 i の位置
+    sprintf("C%.2f,%.2f %.2f,%.2f %.2f,%.2f",
+            px[j] + (px[j + 1] - px[j - 1]) / 6, py[j] + (py[j + 1] - py[j - 1]) / 6,
+            px[j + 1] - (px[j + 2] - px[j]) / 6, py[j + 1] - (py[j + 2] - py[j]) / 6,
+            px[j + 1], py[j + 1])
+  }, "")
+  paste(sprintf("M%.2f,%.2f", x[1], y[1]), paste(seg, collapse = " "))
+}
+
+# 矢印(arrows は transition_arrows() の結果。座標はチームの自コート視点)
 arrows_svg <- function(arrows, mine, offset, pr) {
-  if (is.null(arrows) || nrow(arrows) == 0) return(character())
-  a <- to_display(arrows$x1, arrows$y1, mine, offset)
-  b <- to_display(arrows$x2, arrows$y2, mine, offset)
-  p1 <- project_point(pr, a$x, a$y)
-  p2 <- project_point(pr, b$x, b$y)
-  role <- ifelse(arrows$role %in% ARROW_ROLES, arrows$role, "none")
-  sprintf(
-    '<line class="move-arrow role-%s" x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f" marker-end="url(#rp-arrow-%s)"/>',
-    role, p1$x, p1$y, p2$x, p2$y, role
-  )
+  if (length(arrows) == 0) return(character())
+  vapply(arrows, function(a) {
+    d <- to_display(a$x, a$y, mine, offset)
+    p <- project_point(pr, d$x, d$y)
+    sprintf('<path class="move-arrow role-%s" d="%s" marker-end="url(#rp-arrow)"/>', a$role, smooth_path(p$x, p$y))
+  }, "")
 }
 
 # 表示座標の線分を写して描く

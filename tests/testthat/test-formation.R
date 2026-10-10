@@ -8,26 +8,36 @@ test_that("既定のレセプションフォーメーションはどのローテ
   }
 })
 
-test_that("OH 2人とリベロがレセプションの列に並ぶ", {
+test_that("5-1 の並びではレセプションの型(レクチャー)の位置になる", {
   us <- teams$us
   for (k in 0:5) {
-    cp <- court_players(us, k, serving = FALSE)
+    rt <- reception_template(us, k)
+    expect_false(is.null(rt))
     pl <- default_reception(us, k)
-    passers <- cp$pos[cp$role %in% c("OH", "L")]
-    others <- cp$pos[!cp$role %in% c("OH", "L", "S")]
-    expect_length(passers, 3)
-    # レセプション陣は横に広がり、ネット際の選手より後ろにいる
-    expect_gt(diff(range(pl$x[passers])), 4)
-    expect_true(all(pl$y[passers] >= 5))
-    front_others <- others[is_front_row(others)]
-    expect_true(all(pl$y[front_others] < 2))
+    sp <- as.character(setter_position(us, k))
+    for (slot in names(rt$slots)) {
+      expect_equal(unlist(pl[pl$pos == rt$slots[[slot]], c("x", "y")]), RECEPTION_TEMPLATES[[sp]]$pos[[slot]],
+                   ignore_attr = TRUE, info = paste(rotation_label(us, k), slot))
+    }
   }
 })
 
-test_that("後衛のセッターは前の選手のすぐ後ろに隠れる", {
-  us <- teams$us
-  # S2(k = 5):セッター P2 は前衛、S6(k = 1):セッター P6 は後衛で P3 の後ろ
-  pl <- default_reception(us, 1)
+test_that("型の枠:リベロがいなければ後衛の MB が L の枠に入る。5-1 でなければ型を使わない", {
+  t <- teams$us
+  t$libero <- NA_character_
+  expect_false(is.null(reception_slots(t, 0)))
+  t2 <- teams$us
+  t2$players$role[t2$players$role == "OP"] <- "OH"   # OH が3人
+  expect_null(reception_slots(t2, 0))
+  expect_identical(default_reception(t2, 0), generic_reception(t2, 0))
+  t3 <- teams$us
+  t3$lineup <- t3$lineup[c(1, 3, 2, 4, 6, 5)]         # S → MB → OH の並び(型の前提と違う)
+  expect_false(is_standard_5_1(t3))
+  expect_null(reception_template(t3, 0))
+})
+
+test_that("型が使えない並びの自動の隊形:後衛のセッターは前の選手の後ろに隠れる", {
+  pl <- generic_reception(teams$us, 1)   # S6:セッター P6 は後衛で P3 の後ろ
   expect_lt(pl$y[6], 3)
   expect_gt(pl$y[6], pl$y[3])
 })
@@ -60,28 +70,35 @@ test_that("標準の並びでは選手の丸が重ならない", {
     pl <- default_reception(team, k)
     d <- as.matrix(dist(pl[, c("x", "y")]))
     diag(d) <- Inf
-    expect_gt(min(d), 1.7, label = paste(team$id, rotation_label(team, k), "の最小距離"))
+    expect_gt(min(d), 1.24, label = paste(team$id, rotation_label(team, k), "の最小距離"))
   }
 })
 
-test_that("レシーブ後の攻撃位置:前衛3人とセッター、後衛の OH/OP が動き、リベロは動かない", {
+test_that("矢印:型の経路を、選手の今の立ち位置から描く(セッター・リベロはなし)", {
   us <- teams$us
-  # S1(k = 0):前衛 P4 OP, P3 MB, P2 OH、後衛 P5 OH, P6 L, P1 S
-  ap <- attack_positions(us, 0)
-  expect_setequal(ap$pos, c(4, 3, 2, 5, 1))
-  expect_equal(ap$x[ap$pos == 2], ATTACK_SPOTS$front_OH[1])  # 前衛 OH はレフトへ
-  expect_equal(ap$x[ap$pos == 4], ATTACK_SPOTS$front_OP[1])  # OP はライトへ
-  expect_equal(ap$y[ap$pos == 1], ATTACK_SPOTS$setter[2])    # セッターはネットへ
-  expect_false(6 %in% ap$pos)                                # リベロ
+  for (k in 0:5) {
+    pl <- default_reception(us, k)
+    ar <- transition_arrows(us, k, pl)
+    roles <- vapply(ar, `[[`, "", "role")
+    expect_setequal(roles, c("OP", "MB", "OH", "OH"))
+    for (a in ar) {
+      expect_gte(length(a$x), 2)
+      # 終点は、前衛ならネット際、後衛ならアタックラインの後ろ
+      expect_true(tail(a$y, 1) %in% c(ATTACK_FRONT_Y, ATTACK_BACK_Y))
+    }
+  }
+  # 立ち位置を動かすと、矢印の始点も動く
+  pl <- default_reception(us, 0)
+  rt <- reception_template(us, 0)
+  pl[pl$pos == rt$slots[["MB"]], c("x", "y")] <- c(3, 4)
+  mb <- Filter(function(a) a$role == "MB", transition_arrows(us, 0, pl))[[1]]
+  expect_equal(c(mb$x[1], mb$y[1]), c(3, 4))
 })
 
-test_that("矢印はレセプション位置から攻撃位置へ向かう", {
-  us <- teams$us
-  pl <- default_reception(us, 0)
-  ar <- transition_arrows(us, 0, pl)
-  s <- ar[ar$role == "S", ]
-  expect_equal(nrow(s), 1)
-  expect_equal(c(s$x1, s$y1), unlist(pl[pl$pos == 1, c("x", "y")]), ignore_attr = TRUE)
-  expect_equal(c(s$x2, s$y2), ATTACK_SPOTS$setter)
-  expect_true(all(sqrt((ar$x2 - ar$x1)^2 + (ar$y2 - ar$y1)^2) >= 0.8))
+test_that("型が使えない並びでは、役割から決めた攻撃位置へまっすぐ向かう", {
+  t <- teams$us
+  t$players$role[t$players$role == "OP"] <- "OH"
+  ar <- transition_arrows(t, 0, default_reception(t, 0))
+  expect_true(all(vapply(ar, function(a) length(a$x) == 2, logical(1))))
+  expect_false(any(vapply(ar, `[[`, "", "role") %in% c("S", "L")))
 })

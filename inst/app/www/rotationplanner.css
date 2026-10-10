@@ -77,14 +77,9 @@ body { font-size: 15px; }
 .rp-dot.role-OP { background: var(--rp-OP); }
 .rp-dot.role-L { background: var(--rp-L); }
 
-/* レシーブ後の移動の矢印(役割の色) */
-.rp-court .move-arrow { stroke: #555; stroke-width: 0.13; stroke-dasharray: 0.35 0.2; opacity: 0.85; }
-.rp-court .move-arrow.role-S, .rp-court .arrowhead.role-S path { stroke: var(--rp-S); fill: var(--rp-S); }
-.rp-court .move-arrow.role-OH, .rp-court .arrowhead.role-OH path { stroke: var(--rp-OH); fill: var(--rp-OH); }
-.rp-court .move-arrow.role-MB, .rp-court .arrowhead.role-MB path { stroke: var(--rp-MB); fill: var(--rp-MB); }
-.rp-court .move-arrow.role-OP, .rp-court .arrowhead.role-OP path { stroke: var(--rp-OP); fill: var(--rp-OP); }
-.rp-court .move-arrow.role-L, .rp-court .arrowhead.role-L path { stroke: var(--rp-L); fill: var(--rp-L); }
-.rp-court .arrowhead path { stroke: none !important; }
+/* レシーブ後に攻撃へ入る動きの矢印 */
+.rp-court .move-arrow { fill: none; stroke: #1f2a44; stroke-width: 0.11; stroke-linecap: round; opacity: 0.9; pointer-events: none; }
+.rp-court .arrowhead path { fill: #1f2a44; }
 
 /* データタブ */
 .rp-errors-text { color: var(--rp-bad); }

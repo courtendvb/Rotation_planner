@@ -1,6 +1,7 @@
 # 既定のフォーメーション ------------------------------------------------------------
 #
-# レシーブ時は、役割からサーブレシーブ隊形を自動で作る(3人レセプション)。
+# レシーブ時は、5-1 の並びならレセプションの型(reception.R、指導者のレクチャー)を使う。
+# それ以外の並びでは、役割からサーブレシーブ隊形を自動で作る(3人レセプション)。
 #   - レセプション:OH 2人とリベロ(足りなければ後衛の S 以外で補う)が横一列に並ぶ
 #   - 後衛のセッター:前衛の対応する選手のすぐ後ろに隠れ、すぐ前に出られる位置
 #   - 前衛のセッター・レセプションに入らない前衛:ネット際
@@ -47,6 +48,12 @@ reception_passers <- function(cp) {
 
 #' レシーブ時の既定のフォーメーション
 default_reception <- function(team, k) {
+  rt <- reception_template(team, k)
+  if (!is.null(rt)) template_placement(rt) else generic_reception(team, k)
+}
+
+#' 役割から自動で作るレセプションの隊形(型が使えない並び用)
+generic_reception <- function(team, k) {
   cp <- court_players(team, k, serving = FALSE)
   pl <- default_placement()
   col <- POSITION_COLUMN[as.character(pl$pos)]
@@ -123,33 +130,32 @@ placement_for <- function(team, k, serving, placements = list()) {
   placements[[placement_key(team, k, serving)]] %||% default_formation(team, k, serving)
 }
 
-# レシーブ後の攻撃位置 --------------------------------------------------------------
+# レシーブ後の攻撃に入る動き --------------------------------------------------------
 #
-# サイドアウト側(レシーブ側)の選手が、レセプションの位置から向かう位置。
-#   セッター        :セットアップ位置(ネット際のライト寄り)
-#   前衛 OH         :レフトの助走開始位置
-#   前衛 MB         :センターのクイックの助走位置
-#   前衛 OP         :ライトの助走開始位置
-#   後衛 OH         :バックアタック(パイプ)の助走位置
-#   後衛 OP         :バックライト(D)の助走位置
-#   リベロ・後衛 MB :動かない(矢印なし)
+# 5-1 の並びでは、レセプションの型(reception.R)の経路を使う。
+# それ以外の並びでは、役割から決めた攻撃位置へまっすぐ向かう。
+#   前衛 OH:レフト、前衛 MB:センター、前衛 OP:ライト(いずれもネット際)
+#   後衛 OH:パイプ、後衛 OP:バックライト(いずれもアタックラインの後ろ)
+#   セッター・リベロ・後衛 MB:矢印なし
+# 攻撃に入る位置の深さ:前衛はネット際、後衛はアタックラインのすぐ後ろ
+ATTACK_FRONT_Y <- 0.5
+ATTACK_BACK_Y <- 3.2
+
 ATTACK_SPOTS <- list(
-  setter = c(6.0, 0.6),
-  front_OH = c(0.6, 3.6),
-  front_MB = c(4.2, 2.6),
-  front_OP = c(8.4, 3.6),
-  back_OH = c(4.5, 7.0),
-  back_OP = c(7.8, 7.0)
+  front_OH = c(0.4, ATTACK_FRONT_Y),
+  front_MB = c(4.0, ATTACK_FRONT_Y),
+  front_OP = c(8.6, ATTACK_FRONT_Y),
+  back_OH = c(4.5, ATTACK_BACK_Y),
+  back_OP = c(8.4, ATTACK_BACK_Y)
 )
 
-#' レシーブ後の攻撃位置。data.frame(pos, role, x, y)(動かない選手は含まない)
+#' 型が使えない並びでの攻撃位置。data.frame(pos, role, x, y)(動かない選手は含まない)
 attack_positions <- function(team, k) {
   cp <- court_players(team, k, serving = FALSE)
   rows <- lapply(seq_len(nrow(cp)), function(i) {
     role <- cp$role[i]
     if (is.na(role)) return(NULL)
-    key <- if (role == "S") "setter" else paste0(if (is_front_row(cp$pos[i])) "front_" else "back_", role)
-    spot <- ATTACK_SPOTS[[key]]
+    spot <- ATTACK_SPOTS[[paste0(if (is_front_row(cp$pos[i])) "front_" else "back_", role)]]
     if (is.null(spot)) return(NULL)
     data.frame(pos = cp$pos[i], role = role, x = spot[1], y = spot[2])
   })
@@ -157,10 +163,25 @@ attack_positions <- function(team, k) {
   if (is.null(out)) data.frame(pos = integer(), role = character(), x = numeric(), y = numeric()) else out
 }
 
-#' レセプション位置 → 攻撃位置 の矢印。data.frame(role, x1, y1, x2, y2)(短すぎるものは省く)
+#' レセプション位置から攻撃に入る動きの矢印。
+#' 戻り値は矢印のリスト。各要素は list(role, x, y)(x, y は始点から終点までの点の並び)。
+#' 始点は今の立ち位置(placement)なので、選手をドラッグすると矢印の始点も動く
 transition_arrows <- function(team, k, placement, min_length = 0.8) {
-  ap <- attack_positions(team, k)
-  from <- placement[match(ap$pos, placement$pos), ]
-  arrows <- data.frame(role = ap$role, x1 = from$x, y1 = from$y, x2 = ap$x, y2 = ap$y)
-  arrows[sqrt((arrows$x2 - arrows$x1)^2 + (arrows$y2 - arrows$y1)^2) >= min_length, , drop = FALSE]
+  start <- function(pos) unlist(placement[placement$pos == pos, c("x", "y")])
+  rt <- reception_template(team, k)
+  arrows <- if (!is.null(rt)) {
+    lapply(names(rt$template$path), function(slot) {
+      pos <- rt$slots[[slot]]
+      path <- rt$template$path[[slot]]
+      s <- start(pos)
+      list(role = court_players(team, k, FALSE)$role[pos], x = c(s[[1]], path$x), y = c(s[[2]], path$y))
+    })
+  } else {
+    ap <- attack_positions(team, k)
+    lapply(seq_len(nrow(ap)), function(i) {
+      s <- start(ap$pos[i])
+      list(role = ap$role[i], x = c(s[[1]], ap$x[i]), y = c(s[[2]], ap$y[i]))
+    })
+  }
+  Filter(function(a) sum(sqrt(diff(a$x)^2 + diff(a$y)^2)) >= min_length, arrows)
 }
