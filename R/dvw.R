@@ -58,16 +58,12 @@ dvw_players <- function(lines, side) {
   )[!is.na(suppressWarnings(as.integer(f[, 2]))), ]
 }
 
-#' スカウトの行を表にする
-dvw_plays <- function(lines) {
-  lines <- lines[nzchar(trimws(lines))]
-  if (length(lines) == 0) return(NULL)
-  f <- split_fields(lines, 26)
-  code <- f[, 1]
+#' スカウトのコードを分解する(チーム、得点の行か、背番号、スキル、タイプ、コンビ、開始ゾーン)
+parse_scout_codes <- function(code) {
   num <- function(x) suppressWarnings(as.integer(x))
   team <- ifelse(substr(code, 1, 1) == "*", "home", ifelse(substr(code, 1, 1) == "a", "visiting", NA))
   is_skill <- grepl("^[*a][0-9]{2}[SREABDF]", code)
-  out <- data.frame(
+  data.frame(
     code = code,
     team = team,
     point = grepl("^[*a]p", code),
@@ -75,11 +71,20 @@ dvw_plays <- function(lines) {
     skill = ifelse(is_skill, substr(code, 4, 4), NA_character_),
     type = ifelse(is_skill, substr(code, 5, 5), NA_character_),
     combo = ifelse(is_skill, substr(code, 7, 8), NA_character_),
-    start_zone = ifelse(is_skill, num(substr(code, 10, 10)), NA_integer_),
-    set = num(f[, 9]),
-    home_setter = num(f[, 10]),
-    visiting_setter = num(f[, 11])
+    start_zone = ifelse(is_skill, num(substr(code, 10, 10)), NA_integer_)
   )
+}
+
+#' スカウトの行を表にする
+dvw_plays <- function(lines) {
+  lines <- lines[nzchar(trimws(lines))]
+  if (length(lines) == 0) return(NULL)
+  f <- split_fields(lines, 26)
+  num <- function(x) suppressWarnings(as.integer(x))
+  out <- parse_scout_codes(f[, 1])
+  out$set <- num(f[, 9])
+  out$home_setter <- num(f[, 10])
+  out$visiting_setter <- num(f[, 11])
   for (i in 1:6) {
     out[[paste0("home_p", i)]] <- num(f[, 14 + i])
     out[[paste0("visiting_p", i)]] <- num(f[, 20 + i])

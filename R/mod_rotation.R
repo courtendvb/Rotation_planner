@@ -32,8 +32,9 @@ mod_rotation_ui <- function(id, extra_controls = NULL) {
 #' teams: list(us, them) の reactiveVal。placements: 立ち位置を保存する reactiveVal。
 #' stats / has_data / prior_n: 対面別の実績(データタブ)
 #' start: スタートを外から決める場合の reactive(list(us_start, them_start, first))。NULL なら画面で選ぶ
+#' prob : 見込みを外から渡す場合の reactive(rally_prob_from_stats() の形)。NULL なら stats から作る
 mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_matchup_stats()),
-                                has_data = reactive(FALSE), prior_n = reactive(10), start = NULL) {
+                                has_data = reactive(FALSE), prior_n = reactive(10), start = NULL, prob = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -75,7 +76,7 @@ mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_ma
       list(us_start = as.integer(input$us_start), them_start = as.integer(input$them_start),
            first = input$first_server)
     })
-    prob <- reactive(rally_prob_from_stats(stats(), prior_n()))
+    if (is.null(prob)) prob <- reactive(rally_prob_from_stats(stats(), prior_n()))
 
     # 12 の対面と、それぞれの立ち位置・ラリー取得率
     boards <- reactive({

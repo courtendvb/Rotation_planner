@@ -137,6 +137,29 @@ tests/testthat/ テスト
 - Matchup タブには、この試合の対面別の実績と、スタートの検討(セット取得確率)を表示します
 - ドラッグした立ち位置や S1 のパターンは見ている人(ブラウザ)ごとに持ち、ファイルには保存しません(ベンチの複数の PC で操作しても干渉しない)
 
+## 試合前のスカウティングアプリへの組み込み
+
+複数の試合の記録から、相手チームとのマッチアップを試合前に検討するタブです(`R/mod_pre_match.R`)。
+
+```r
+  nav_menu(
+    title = "Rotation",
+    tabPanel(title = "Board", rotationplanner::pre_match_board_ui("rotation")),
+    tabPanel(title = "Matchup", rotationplanner::pre_match_matchup_ui("rotation"))
+  )
+```
+
+```r
+  rotationplanner::pre_match_server("rotation", plays = data1,
+                                    opponent = reactive(input$master_ui_team_id), our_team = "HTH")
+```
+
+- `plays` は `datavolley::read_dv()` の plays を試合ごとにつないだもの(reactive)。列を足したもの(既存アプリの `data1()`)でもよい
+- 相手チームはアプリのサイドバーで、自チームは Board タブで選ぶ(`our_team` は初期値)
+- チームの並びは、それぞれの一番新しい試合の最初のセットのスタート。セッターはそのセットの記録のセッター位置の選手にする(試合の中でセッターが替わったチームでもずれないように)。リベロは P1〜P6 に入らずにプレーした選手
+- 対面別の実績は2チームの対戦だけから数え、見込みは対戦の少ない対面ほど、相手を問わない全試合のローテーション別の実績に寄せる(`rally_prob_from_stats(rotations = ...)`)
+- Matchup タブには、全試合のローテーション別のサイドアウト・ブレイクと、これまでのスタートローテーション(セット数と取ったセット数)も表示する
+
 ## テスト
 
 ```r

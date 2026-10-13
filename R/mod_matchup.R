@@ -49,8 +49,9 @@ mod_matchup_ui <- function(id) {
 }
 
 #' teams: list(us, them) の reactiveVal。stats / has_data / prior_n: 対面別の実績(データタブ)
+#' prob : 見込みを外から渡す場合の reactive(rally_prob_from_stats() の形)。NULL なら stats から作る
 mod_matchup_server <- function(id, teams, placements = reactive(list()), stats = reactive(empty_matchup_stats()),
-                               has_data = reactive(FALSE), prior_n = reactive(10)) {
+                               has_data = reactive(FALSE), prior_n = reactive(10), prob = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -94,7 +95,7 @@ mod_matchup_server <- function(id, teams, placements = reactive(list()), stats =
       as.numeric(0:5 %in% sel)
     })
 
-    prob <- reactive(rally_prob_from_stats(stats(), prior_n()))
+    if (is.null(prob)) prob <- reactive(rally_prob_from_stats(stats(), prior_n()))
     mat <- reactive(start_matrix(prob(), input$first_server, target()))
     ranking <- reactive(rank_starts(mat(), weights()))
 

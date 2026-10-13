@@ -63,10 +63,12 @@ rotation_summary <- function(ms, side = "us") {
 #' 対面別の見込み:自チームがラリーを取る確率。
 #' 戻り値は array [自チームのローテ + 1, 相手のローテ + 1, サーブ権(1 = us, 2 = them)]。
 #'   prior_n: 実績が何本たまったら、より大きな単位の値と半々にするか
-rally_prob_from_stats <- function(ms = empty_matchup_stats(), prior_n = 10) {
+#'   rotations: ローテーション単位の実績を外から渡す場合の list(us, them)(rotation_summary() の形)。
+#'              試合前の検討で、対戦以外の試合も含めた実績を使うときに渡す。NULL なら ms から作る
+rally_prob_from_stats <- function(ms = empty_matchup_stats(), prior_n = 10, rotations = NULL) {
   shrink <- function(won, n, prior) (won + prior_n * prior) / (n + prior_n)
-  us_rot <- rotation_summary(ms, "us")
-  them_rot <- rotation_summary(ms, "them")
+  us_rot <- if (is.null(rotations)) rotation_summary(ms, "us") else rotations$us
+  them_rot <- if (is.null(rotations)) rotation_summary(ms, "them") else rotations$them
   p <- array(NA_real_, dim = c(6, 6, 2), dimnames = list(us = 0:5, them = 0:5, server = SIDES))
 
   for (srv in SIDES) {
@@ -74,7 +76,16 @@ rally_prob_from_stats <- function(ms = empty_matchup_stats(), prior_n = 10) {
     m <- ms[ms$server == srv, ]
     # チーム全体(この局面の自チームの取得率)
     default <- if (srv == "them") DEFAULT_SIDE_OUT else 1 - DEFAULT_SIDE_OUT
-    overall <- shrink(sum(m$won), sum(m$n), default)
+    overall <- if (is.null(rotations)) {
+      shrink(sum(m$won), sum(m$n), default)
+    } else if (srv == "them") {
+      # 自チームのサイドアウトと、相手のサーブで相手が取れなかった分
+      shrink(sum(us_rot$side_out) + sum(them_rot$serve - them_rot$break_point),
+             sum(us_rot$receive) + sum(them_rot$serve), default)
+    } else {
+      shrink(sum(us_rot$break_point) + sum(them_rot$receive - them_rot$side_out),
+             sum(us_rot$serve) + sum(them_rot$receive), default)
+    }
     for (a in 0:5) for (b in 0:5) {
       u <- us_rot[us_rot$rot == a, ]
       t <- them_rot[them_rot$rot == b, ]
