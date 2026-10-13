@@ -33,8 +33,12 @@ mod_rotation_ui <- function(id, extra_controls = NULL) {
 #' stats / has_data / prior_n: 対面別の実績(データタブ)
 #' start: スタートを外から決める場合の reactive(list(us_start, them_start, first))。NULL なら画面で選ぶ
 #' prob : 見込みを外から渡す場合の reactive(rally_prob_from_stats() の形)。NULL なら stats から作る
+#' rates: ローテーション別の実績の reactive(list(us, them)、rotation_summary() の形)。
+#'        渡すと、各コートに対面の見込みではなく、両チームのそのローテーションのサイドアウト率・ブレイク率を出す
+#'        (試合中に「当たり方」と各ローテの調子だけを見る用途。セット取得率も出さない)
 mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_matchup_stats()),
-                                has_data = reactive(FALSE), prior_n = reactive(10), start = NULL, prob = NULL) {
+                                has_data = reactive(FALSE), prior_n = reactive(10), start = NULL, prob = NULL,
+                                rates = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     us <- reactive(teams()$us)
@@ -94,6 +98,8 @@ mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_ma
           a = row$a, us = row$us, them = row$them, us_serving = us_srv,
           p_us = p[row$us + 1, row$them + 1, match(row$server, SIDES)],
           record = ms[ms$us == row$us & ms$them == row$them & ms$server == row$server, c("n", "won")],
+          rates = if (!is.null(rates)) list(us = rates()$us[rates()$us$rot == row$us, ],
+                                            them = rates()$them[rates()$them$rot == row$them, ]),
           us_pl = us_pl, them_pl = them_pl,
           custom = !is.null(placements()[[placement_key(us(), row$us, us_srv)]]) ||
             !is.null(placements()[[placement_key(them(), row$them, !us_srv)]])
@@ -139,7 +145,9 @@ mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_ma
       st <- setup()
       div(
         class = "rp-board-summary",
-        if (has_data()) {
+        if (!is.null(rates)) {
+          span(class = "rp-hint", "各コートは、両チームのそのローテーションのサイドアウト率・ブレイク率(この試合のここまで)")
+        } else if (has_data()) {
           win <- set_win_probability(prob(), st$us_start, st$them_start, st$first)
           span("このスタートでのセット取得率(実績から推定)", strong(pct(win)))
         } else {
@@ -156,6 +164,13 @@ mod_rotation_server <- function(id, teams, placements, stats = reactive(empty_ma
       serve <- Filter(function(b) b$us_serving, bs)
       receive <- Filter(function(b) !b$us_serving, bs)
       note <- function(xs, label) {
+        if (!is.null(rates)) {
+          # この試合の自チーム全体の率
+          r <- rates()$us
+          won <- if (label == "ブレイク") sum(r$break_point) else sum(r$side_out)
+          n <- if (label == "ブレイク") sum(r$serve) else sum(r$receive)
+          return(sprintf("自チームの%s %s", label, rate_text(won, n)))
+        }
         if (!data) return(NULL)
         n <- sum(vapply(xs, function(b) b$record$n, 0))
         won <- sum(vapply(xs, function(b) b$record$won, 0))
@@ -188,23 +203,79 @@ board_card <- function(ns, us, them, b, phase, data = FALSE) {
   baseline <- if (b$us_serving) 1 - DEFAULT_SIDE_OUT else DEFAULT_SIDE_OUT
   rec <- b$record
   label <- if (b$us_serving) "自BP" else "自SO"
+  rates_mode <- !is.null(b$rates)
 
   div(
     class = "rp-board-card",
     div(
       class = "rp-board-head",
       span(class = "rp-board-match", strong(rotation_label(us, b$us)), " vs ", rotation_label(them, b$them)),
-      if (data) span(class = "rp-pill", title = "実績からの見込み",
-                     style = sprintf("background:%s", prob_color(b$p_us - baseline + 0.5)), pct(b$p_us, 0))
+      if (data && !rates_mode) span(class = "rp-pill", title = "実績からの見込み",
+                                    style = sprintf("background:%s", prob_color(b$p_us - baseline + 0.5)), pct(b$p_us, 0))
     ),
+    if (rates_mode) rotation_rates_line(us, them, b),
     div(class = "rp-board-meta",
         sprintf("前衛 自 %d 枚 / 相手 %d 枚", front_attacker_count(us, b$us), front_attacker_count(them, b$them))),
     court_svg(us_m, opponent = them_m, drag_input = ns("move"), compact = TRUE, max_width = 2000,
               us_attrs = drag_attrs(b$us, b$us_serving), them_attrs = drag_attrs(b$them, !b$us_serving),
               us_arrows = us_arrows, them_arrows = them_arrows),
-    if (data) div(class = "rp-board-meta rp-board-actual",
+    if (data && !rates_mode) div(class = "rp-board-meta rp-board-actual",
                   sprintf("この対面の実績 %s %s", label,
                           if (rec$n == 0) "なし" else sprintf("%d/%d", as.integer(rec$won), as.integer(rec$n)))),
     if (b$custom) actionLink(ns(sprintf("reset_%s_%d", phase, b$a)), "標準に戻す", class = "rp-board-reset")
+  )
+}
+
+# ローテーション別の実績の表示 ------------------------------------------------------
+
+#' 率の文字列("40% (2/5)"、実績がなければ "—")
+rate_text <- function(won, n) {
+  if (n == 0) "—" else sprintf("%s (%d/%d)", pct(won / n, 0), as.integer(won), as.integer(n))
+}
+
+#' 率のバッジ(一般的な値との差で色を付ける)
+rate_pill <- function(label, won, n, baseline) {
+  style <- if (n > 0) sprintf("background:%s", prob_color(won / n - baseline + 0.5)) else ""
+  span(class = "rp-pill rp-rate", style = style, paste(label, rate_text(won, n)))
+}
+
+#' ボードのコートに出す、両チームのそのローテーションの率。
+#' 自チームサーブの対面は 自チームのブレイク / 相手のサイドアウト、レセプションの対面はその逆
+rotation_rates_line <- function(us, them, b) {
+  u <- b$rates$us
+  t <- b$rates$them
+  bp <- function(r) c(r$break_point, r$serve)
+  so <- function(r) c(r$side_out, r$receive)
+  if (b$us_serving) {
+    us_r <- bp(u); them_r <- so(t)
+    us_label <- "自BP"; them_label <- "相SO"
+    us_base <- 1 - DEFAULT_SIDE_OUT; them_base <- DEFAULT_SIDE_OUT
+  } else {
+    us_r <- so(u); them_r <- bp(t)
+    us_label <- "自SO"; them_label <- "相BP"
+    us_base <- DEFAULT_SIDE_OUT; them_base <- 1 - DEFAULT_SIDE_OUT
+  }
+  div(class = "rp-board-rates",
+      rate_pill(us_label, us_r[1], us_r[2], us_base),
+      rate_pill(them_label, them_r[1], them_r[2], them_base))
+}
+
+#' ローテーション別のサイドアウト率・ブレイク率の表(rec は rotation_summary() の形)
+rotation_record_table <- function(team, rec) {
+  rate <- function(won, n, baseline) {
+    if (n == 0) return(tags$td(class = "rp-empty", "—"))
+    tags$td(style = sprintf("background:%s", prob_color(won / n - baseline + 0.5)), rate_text(won, n))
+  }
+  tags$table(
+    class = "rp-matrix rp-record",
+    tags$tr(tags$th(team$name), tags$th("サイドアウト"), tags$th("ブレイク")),
+    lapply(0:5, function(k) {
+      r <- rec[rec$rot == k, ]
+      tags$tr(tags$th(rotation_label(team, k)),
+              rate(r$side_out, r$receive, DEFAULT_SIDE_OUT),
+              rate(r$break_point, r$serve, 1 - DEFAULT_SIDE_OUT))
+    }),
+    tags$tr(tags$th("計"), rate(sum(rec$side_out), sum(rec$receive), DEFAULT_SIDE_OUT),
+            rate(sum(rec$break_point), sum(rec$serve), 1 - DEFAULT_SIDE_OUT))
   )
 }

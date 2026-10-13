@@ -1,9 +1,12 @@
 # 試合中のアプリへの組み込み(既存の Shiny アプリにタブとして足す) -----------------------
 #
 # 既存のアプリ(page_navbar など)に、次の2つのタブを足して使う。
-#   UI     : in_match_board_ui("rotation")    … 12面ボード(このセットの対面)
-#            in_match_matchup_ui("rotation")  … 対面別の実績と、スタートの検討
+#   UI     : in_match_board_ui("rotation")    … 12面ボード(このセットの当たり方と、各ローテの率)
+#            in_match_matchup_ui("rotation")  … 両チームのローテーション別のサイドアウト率・ブレイク率
 #   server : in_match_server("rotation", dvw_path = fname)
+#
+# 試合中は「当たり方」と、その時点の各ローテーションの調子だけを見る。
+# ボードの各コートには、対面の見込みではなく、この試合のここまでの両チームのそのローテーションの率を出す。
 #
 # .dvw は自分で読み直す(更新時刻とサイズを見て、変わったときだけ)。
 # 選んだセットのスタートの並びと最初のサーブは .dvw から自動で入る。
@@ -33,10 +36,18 @@ in_match_board_ui <- function(id) {
   )
 }
 
-#' 対面別の実績と、スタートの検討のタブ
+#' ローテーション別の実績のタブ(この試合のここまでの、両チームのサイドアウト率・ブレイク率)
 in_match_matchup_ui <- function(id) {
   ns <- NS(id)
-  tagList(rp_dependency(), mod_matchup_ui(ns("matchup")))
+  tagList(
+    rp_dependency(),
+    div(
+      class = "rp-panel",
+      h4("ローテーション別の実績(この試合のここまで)"),
+      p(class = "rp-hint", "ローテーションは、Board で選んだセットのスタートの並びを基準に、サーブ時のセッター位置で数えます。"),
+      fluidRow(column(6, uiOutput(ns("rotations_us"))), column(6, uiOutput(ns("rotations_them"))))
+    )
+  )
 }
 
 #' 試合中のアプリ用の server。
@@ -137,8 +148,11 @@ in_match_server <- function(id, dvw_path, poll_ms = 3000, prior_n = 10) {
     })
     has_data <- reactive(sum(stats()$n) > 0)
     prior <- reactive(prior_n)
+    # 両チームのローテーション別の実績(この試合のここまで)
+    rates <- reactive(list(us = rotation_summary(stats(), "us"), them = rotation_summary(stats(), "them")))
 
-    mod_rotation_server("board", teams, placements, stats, has_data, prior, start = start)
-    mod_matchup_server("matchup", teams, placements, stats, has_data, prior)
+    mod_rotation_server("board", teams, placements, stats, has_data, prior, start = start, rates = rates)
+    output$rotations_us <- renderUI(rotation_record_table(teams()$us, rates()$us))
+    output$rotations_them <- renderUI(rotation_record_table(teams()$them, rates()$them))
   })
 }

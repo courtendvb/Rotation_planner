@@ -18,6 +18,27 @@ test_that("試合中のモジュール:.dvw からチーム・スタート・実
   })
 })
 
+test_that("試合中のモジュール:各ローテの率をボードと表に出し、見込みは出さない", {
+  path <- make_dvw(tempfile(fileext = ".dvw"))
+  testServer(in_match_server, args = list(dvw_path = path, poll_ms = 100), {
+    session$setInputs(our_side = "home", set = "1",
+                      `board-us_start` = "0", `board-them_start` = "0", `board-first_server` = "us")
+    session$flushReact()
+    # ホーム:サーブ 2 本でブレイク 1、レセプション 1 本でサイドアウト 1
+    us <- rates()$us
+    expect_equal(c(sum(us$serve), sum(us$break_point), sum(us$receive), sum(us$side_out)), c(2, 1, 1, 1))
+    them <- rates()$them
+    expect_equal(c(sum(them$serve), sum(them$break_point), sum(them$receive), sum(them$side_out)), c(1, 0, 2, 1))
+
+    board <- as.character(output$`board-board`$html)
+    expect_match(board, "自BP 50% \\(1/2\\)")
+    expect_match(board, "相SO")
+    expect_false(grepl("この対面の実績", board))
+    expect_false(grepl("セット取得率", as.character(output$`board-summary`$html)))
+    expect_match(as.character(output$rotations_us$html), "サイドアウト")
+  })
+})
+
 test_that("試合中のモジュール:ファイルがなくても落ちない", {
   testServer(in_match_server, args = list(dvw_path = tempfile(fileext = ".dvw"), poll_ms = 100), {
     session$flushReact()

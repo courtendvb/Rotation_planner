@@ -122,7 +122,7 @@ tests/testthat/ テスト
   nav_menu(
     title = "Rotation",
     tabPanel(title = "Board", rotationplanner::in_match_board_ui("rotation")),
-    tabPanel(title = "Matchup", rotationplanner::in_match_matchup_ui("rotation"))
+    tabPanel(title = "Rotation Stats", rotationplanner::in_match_matchup_ui("rotation"))
   )
 ```
 
@@ -134,7 +134,8 @@ tests/testthat/ テスト
 
 - .dvw は3秒ごとに更新を確かめ、変わったときだけ読み直します(既存アプリの読み込みとは独立)
 - 「自チーム」(ホーム/ビジター)と「セット」を選ぶと、そのセットのスタートの並び・最初のサーブが自動で入り、12通りの対面を表示します。新しいセットが始まると自動で移ります
-- Matchup タブには、この試合の対面別の実績と、スタートの検討(セット取得確率)を表示します
+- Board の各コートには、この試合のここまでの両チームのそのローテーションの率(自チームサーブの対面は 自BP / 相SO、レセプションの対面は 自SO / 相BP)を出します。対面の見込みやセット取得率は出しません
+- Rotation Stats タブ(`in_match_matchup_ui`)には、両チームのローテーション別のサイドアウト率・ブレイク率(この試合のここまで)を表示します
 - ドラッグした立ち位置や S1 のパターンは見ている人(ブラウザ)ごとに持ち、ファイルには保存しません(ベンチの複数の PC で操作しても干渉しない)
 
 ## 試合前のスカウティングアプリへの組み込み

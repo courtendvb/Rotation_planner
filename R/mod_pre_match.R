@@ -159,27 +159,8 @@ pre_match_server <- function(id, plays, our_team, opponent = NULL, prior_n = 10)
       )
     })
 
-    rotation_table <- function(team, rec) {
-      rate <- function(won, n, baseline) {
-        if (n == 0) return(tags$td(class = "rp-empty", "—"))
-        tags$td(style = sprintf("background:%s", prob_color(won / n - baseline + 0.5)),
-                sprintf("%s (%d/%d)", pct(won / n, 0), as.integer(won), as.integer(n)))
-      }
-      tags$table(
-        class = "rp-matrix rp-record",
-        tags$tr(tags$th(team$name), tags$th("サイドアウト"), tags$th("ブレイク")),
-        lapply(0:5, function(k) {
-          r <- rec[rec$rot == k, ]
-          tags$tr(tags$th(rotation_label(team, k)),
-                  rate(r$side_out, r$receive, DEFAULT_SIDE_OUT),
-                  rate(r$break_point, r$serve, 1 - DEFAULT_SIDE_OUT))
-        }),
-        tags$tr(tags$th("計"), rate(sum(rec$side_out), sum(rec$receive), DEFAULT_SIDE_OUT),
-                rate(sum(rec$break_point), sum(rec$serve), 1 - DEFAULT_SIDE_OUT))
-      )
-    }
-    output$rotations_us <- renderUI({ req(valid()); rotation_table(teams()$us, rotations()$us) })
-    output$rotations_them <- renderUI({ req(valid()); rotation_table(teams()$them, rotations()$them) })
+    output$rotations_us <- renderUI({ req(valid()); rotation_record_table(teams()$us, rotations()$us) })
+    output$rotations_them <- renderUI({ req(valid()); rotation_record_table(teams()$them, rotations()$them) })
 
     start_table <- function(team, rec) {
       tags$table(

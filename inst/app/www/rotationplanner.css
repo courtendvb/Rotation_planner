@@ -100,3 +100,5 @@ body { font-size: 15px; }
 .rp-board-controls .rp-hint { margin-bottom: 8px; }
 /* 既存アプリに組み込んだとき(ナビゲーションや入力欄が大きいぶん、コートを少し小さく) */
 .rp-in-match .rp-board-card .rp-court { height: calc((100vh - 420px) / 2); }
+.rp-board-rates { display: flex; justify-content: center; gap: 6px; margin: 2px 0; }
+.rp-board-rates .rp-rate { font-size: 12px; font-weight: normal; border: 1px solid #ddd; }
