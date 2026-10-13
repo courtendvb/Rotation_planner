@@ -3,13 +3,15 @@
 # 既存のアプリ(page_navbar など)に、次の2つのタブを足して使う。
 #   UI     : pre_match_board_ui("rotation")    … 12面ボード(選んだスタートで起きる対面)
 #            pre_match_matchup_ui("rotation")  … 対面別の実績、全試合のローテーション別の実績、スタートの検討
-#   server : pre_match_server("rotation", plays = data1, opponent = reactive(input$master_ui_team_id))
+#   server : pre_match_server("rotation", plays = data1, our_team = "HTH",
+#                             opponent = reactive(input$master_ui_team_id))
 #
 # plays は datavolley::read_dv() の plays を試合ごとにつないだもの(reactive)。
-# 相手チームはアプリ側(サイドバー)で選び、自チームはボードのタブで選ぶ。
+# 自チームは our_team で固定し、相手チームはボードのタブで選ぶ(opponent は初期値。変わればそれに合わせる)。
+# 両チームの選手(並び、リベロ、役割など)はボードのタブで変更できる。
 # 対面別の実績は2チームの対戦だけから、ローテーション単位の実績は相手を問わない全試合から作り、
 # 対戦の少ない対面ほど全試合の実績に寄せて見込みを出す。
-# 画面の状態(ドラッグした立ち位置、S1 のパターン)はファイルに保存せず、見ている人ごとに持つ。
+# 画面の状態(ドラッグした立ち位置、S1 のパターン、変更した選手)はファイルに保存せず、見ている人ごとに持つ。
 
 #' 12面ボードのタブ
 pre_match_board_ui <- function(id) {
@@ -19,8 +21,20 @@ pre_match_board_ui <- function(id) {
     div(
       class = "rp-in-match",
       mod_rotation_ui(ns("board"), extra_controls = tagList(
-        uiOutput(ns("our_team"), inline = TRUE), uiOutput(ns("status"), inline = TRUE)
-      ))
+        uiOutput(ns("opponent"), inline = TRUE),
+        checkboxInput(ns("edit_players"), "選手を変更する", value = FALSE),
+        uiOutput(ns("status"), inline = TRUE)
+      )),
+      conditionalPanel(
+        "input.edit_players", ns = ns,
+        div(
+          class = "rp-panel",
+          p(class = "rp-hint", "変更は、相手チームを選び直すまでこの画面だけに残ります(データは変わりません)。",
+            actionLink(ns("reset_players"), "データの並びに戻す")),
+          fluidRow(column(6, h4("自チーム"), mod_roster_ui(ns("roster_us"))),
+                   column(6, h4("相手チーム"), mod_roster_ui(ns("roster_them"))))
+        )
+      )
     )
   )
 }
@@ -44,51 +58,70 @@ pre_match_matchup_ui <- function(id) {
 
 #' 試合前のアプリ用の server。
 #'   plays   : datavolley の plays を試合ごとにつないだ data.frame を返す reactive
-#'   opponent: 相手チームの team_id(文字列、または文字列を返す reactive)
-#'   our_team: 自チームの team_id の初期値(データにない場合は、相手以外で試合数の最も多いチーム)
+#'   our_team: 自チームの team_id(固定)
+#'   opponent: 相手チームの初期値の team_id(文字列、または文字列を返す reactive、NULL)。
+#'             自チームと同じかデータにないときは、自チーム以外で試合数の最も多いチーム
 #'   prior_n : 対戦の少ない対面の補正(何本で半分信頼するか)
-pre_match_server <- function(id, plays, opponent, our_team = NULL, prior_n = 10) {
+pre_match_server <- function(id, plays, our_team, opponent = NULL, prior_n = 10) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    opponent_id <- if (is.reactive(opponent)) opponent else reactive(opponent)
+    opponent_hint <- if (is.reactive(opponent)) opponent else reactive(opponent)
 
     matches <- reactive(dv_matches_from_plays(plays()))
     index <- reactive(pre_match_team_index(matches()))
+    us_id <- reactive(our_team)
 
-    default_us <- reactive({
-      ids <- index()$team_id
-      if (!is.null(our_team) && our_team %in% ids) return(our_team)
-      others <- setdiff(ids, opponent_id())
-      if (length(others)) others[1] else NA_character_
+    opponent_choices <- reactive(index()[index()$team_id != our_team, , drop = FALSE])
+    default_them <- reactive({
+      ids <- opponent_choices()$team_id
+      hint <- opponent_hint()
+      if (length(hint) == 1 && !is.na(hint) && hint %in% ids) hint else if (length(ids)) ids[1] else NA_character_
     })
-    output$our_team <- renderUI({
-      idx <- index()
+    output$opponent <- renderUI({
+      idx <- opponent_choices()
       req(nrow(idx) > 0)
-      current <- isolate(input$our_team)
-      selectInput(ns("our_team"), "自チーム", stats::setNames(idx$team_id, paste0(idx$team, " (", idx$team_id, ")")),
-                  selected = if (!is.null(current) && current %in% idx$team_id) current else default_us(),
-                  width = "220px")
+      current <- isolate(input$opponent)
+      selectInput(ns("opponent"), "相手チーム", stats::setNames(idx$team_id, paste0(idx$team, " (", idx$team_id, ")")),
+                  selected = if (!is.null(current) && current %in% idx$team_id) current else default_them(),
+                  width = "240px")
     })
-    us_id <- reactive(input$our_team %||% default_us())
-    them_id <- reactive(opponent_id() %||% NA_character_)
+    # アプリ側(サイドバーなど)で相手が変わったら、ボードの選択も合わせる
+    observeEvent(opponent_hint(), {
+      hint <- opponent_hint()
+      if (length(hint) == 1 && !is.na(hint) && hint %in% opponent_choices()$team_id &&
+          !identical(hint, input$opponent)) {
+        updateSelectInput(session, "opponent", selected = hint)
+      }
+    }, ignoreInit = TRUE)
+    them_id <- reactive({
+      sel <- input$opponent
+      if (!is.null(sel) && sel %in% opponent_choices()$team_id) sel else default_them()
+    })
     valid <- reactive({
       ids <- index()$team_id
-      !is.na(us_id()) && !is.na(them_id()) && us_id() %in% ids && them_id() %in% ids && us_id() != them_id()
+      !is.na(them_id()) && us_id() %in% ids && them_id() %in% ids && us_id() != them_id()
     })
 
-    # チーム:それぞれの一番新しい試合の最初のセットのスタート(ローテ 0)
+    # チーム:それぞれの一番新しい試合の最初のセットのスタート(ローテ 0)。
+    # ボードで変更した選手は、相手チームやデータが変わるまで残す
     teams <- reactiveVal(sample_teams())
-    observe({
+    from_data <- reactive({
       req(valid())
-      cur <- isolate(teams())
       us <- pre_match_team(matches(), us_id(), "us")
       them <- pre_match_team(matches(), them_id(), "them")
       req(us, them)
-      us$reception_variants <- cur$us$reception_variants
-      them$reception_variants <- cur$them$reception_variants
-      new <- list(us = us, them = them)
-      if (!identical(new, cur)) teams(new)
+      list(us = us, them = them)
     })
+    load_teams <- function(new) {
+      cur <- isolate(teams())
+      new$us$reception_variants <- cur$us$reception_variants
+      new$them$reception_variants <- cur$them$reception_variants
+      if (!identical(new, cur)) teams(new)
+    }
+    observe(load_teams(from_data()))
+    observeEvent(input$reset_players, load_teams(from_data()))
+    mod_roster_server("roster_us", teams, "us")
+    mod_roster_server("roster_them", teams, "them")
 
     empty_rotations <- data.frame(rot = 0:5, receive = 0, side_out = 0, serve = 0, break_point = 0)
     rotations <- reactive({
@@ -110,8 +143,8 @@ pre_match_server <- function(id, plays, opponent, our_team = NULL, prior_n = 10)
     count_matches <- function(id) length(matches_of(matches(), id))
     status_text <- reactive({
       if (length(matches()) == 0) return("試合のデータがありません")
-      if (is.na(them_id()) || !them_id() %in% index()$team_id) return("相手チームのデータがありません")
-      if (!valid()) return("自チームと相手チームに別のチームを選んでください")
+      if (!our_team %in% index()$team_id) return(sprintf("自チーム(%s)の試合がデータにありません", our_team))
+      if (!valid()) return("相手チームのデータがありません")
       sprintf("対戦 %d 試合 / %s %d 試合 / %s %d 試合", attr(stats(), "matches") %||% 0L,
               teams()$us$name, count_matches(us_id()), teams()$them$name, count_matches(them_id()))
     })
@@ -122,7 +155,7 @@ pre_match_server <- function(id, plays, opponent, our_team = NULL, prior_n = 10)
         p(class = "rp-hint",
           "対面別の実績はこの2チームの対戦だけから数えます。見込みは、対戦の少ない対面ほど、",
           "相手を問わない全試合のローテーション別の実績に寄せて計算します。",
-          "自チームはボードのタブで、相手チームはサイドバーで選びます。")
+          "相手チームと、両チームの選手はボードのタブで選び・変更します。")
       )
     })
 

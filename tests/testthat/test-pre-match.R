@@ -86,19 +86,54 @@ test_that("ローテーション単位の実績を外から渡すと、それを
   expect_equal(unname(p[1, 1, "us"]), 0.5, tolerance = 0.01)
 })
 
-test_that("試合前のモジュール:相手と自チームを選ぶとチームと実績が入る", {
-  plays <- rbind(fake_dv_plays(1), fake_dv_plays(2))
-  testServer(pre_match_server, args = list(plays = reactive(plays), opponent = reactive("V1"), our_team = "H1"), {
+pre_match_plays <- function() {
+  rbind(fake_dv_plays(1), fake_dv_plays(2), fake_dv_plays(3, visiting_id = "X9"))
+}
+
+test_that("試合前のモジュール:自チームは固定、相手は初期値からボードで選び直せる", {
+  hint <- reactiveVal("V1")
+  testServer(pre_match_server, args = list(plays = reactive(pre_match_plays()), our_team = "H1", opponent = hint), {
     session$flushReact()
     expect_true(valid())
+    expect_equal(us_id(), "H1")
+    expect_equal(them_id(), "V1")
     expect_equal(teams()$us$name, "山田クラブ")
-    expect_equal(teams()$them$name, "Visitors")
     expect_true(has_data())
     expect_equal(attr(stats(), "matches"), 2L)
     expect_equal(sum(stats()$n), 6)
-    # 相手と同じチームを自チームにすると、無効として扱う
-    session$setInputs(our_team = "V1")
-    expect_false(valid())
+    # 相手の候補に自チームは入らない
+    expect_false("H1" %in% opponent_choices()$team_id)
+
+    # ボードで相手を選び直す
+    session$setInputs(opponent = "X9")
+    expect_equal(them_id(), "X9")
+    expect_equal(attr(stats(), "matches"), 1L)
+  })
+})
+
+test_that("試合前のモジュール:初期値が自チームと同じなら、試合数の最も多い相手にする", {
+  testServer(pre_match_server, args = list(plays = reactive(pre_match_plays()), our_team = "H1",
+                                           opponent = reactive("H1")), {
+    session$flushReact()
+    expect_equal(them_id(), "V1")
+    expect_true(valid())
+  })
+})
+
+test_that("試合前のモジュール:ボードで選手を変更でき、データの並びに戻せる", {
+  testServer(pre_match_server, args = list(plays = reactive(pre_match_plays()), our_team = "H1", opponent = "V1"), {
+    session$flushReact()
+    original <- teams()$us$lineup
+    # P1 の #6 と P2 の #15 を入れ替える
+    session$setInputs(`roster_us-p1` = "us-15")
+    expect_equal(teams()$us$lineup[1], "us-15")
+    session$setInputs(`roster_them-p1` = "them-15")
+    expect_equal(teams()$them$lineup[1], "them-15")
+    # 変更は実績の集計(ローテーションの対応)にも使われる
+    expect_equal(sum(rotations()$us$receive + rotations()$us$serve), 9)
+
+    session$setInputs(reset_players = 1)
+    expect_equal(teams()$us$lineup, original)
   })
 })
 
